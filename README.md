@@ -6,6 +6,8 @@
 - `hex0.sh`: Hex Monitor written in shell script, hex0 file in, raw bytes out, for more details see: https://bootstrapping.miraheze.org/wiki/Stage0
 - `hello_macos-x86_64.hex0`: A minimal hello_world mach-o executable, written in [Hex0 format](https://bootstrapping.miraheze.org/wiki/Hex0).
 
+For unix/linux systems, see [stage0-posix](https://github.com/oriansj/stage0-posix).
+
 ## Example
 Compile the `hello_macos-x86_64.hex0` example, works in Apple Silicon with Rosetta or any Intel Mac.
 ```shell
