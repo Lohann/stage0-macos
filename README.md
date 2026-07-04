@@ -1,13 +1,13 @@
 # stage0-macos
 
-**WIP** boostrap binary seed for MacOS, the goal is bootstrap a compiler from scratch, without relying on tools which doesn't come by default in a fresh MacOS Install.
+**WIP** boostrap binary seed for MacOS, the goal is bootstrap a compiler from scratch, without relying on tools which are not installed by default in a fresh MacOS System (not even xcode command line tools).
 
 ## Project Structure
 - `hex0.sh`: Hex Monitor written in shell script, hex0 file in, raw bytes out, for more details see: https://bootstrapping.miraheze.org/wiki/Stage0
 - `hello_macos-x86_64.hex0`: A minimal hello_world mach-o executable, written in [Hex0 format](https://bootstrapping.miraheze.org/wiki/Hex0).
 
 ## Example
-Compile the `hello_macos-x86_64.hex0` example:
+Compile the `hello_macos-x86_64.hex0` example, works in Apple Silicon with Rosetta or any Intel Mac.
 ```shell
 # Make sure the hex0.sh is executable
 chmod +x ./hex0.sh
@@ -18,7 +18,8 @@ chmod +x ./hex0.sh
 # Make it executable
 chmod +x hello_world
 
-# Works in Apple Sillicon with Rosetta or Intel Mac.
+# Works in Apple Silicon with Rosetta or any Intel Mac.
 ./hello_world
 ```
 
+TODO: Will push a Aarch64 hex0 example once a figure out how to create a portable executable without depending on apples dyld.
