@@ -6,6 +6,7 @@
  * 
  * Mach-O Reference:
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/EXTERNAL_HEADERS/mach-o/loader.h#L50-L81
+ * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/machine.h#L127-L482
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/mach_loader.c#L1225-L1996
  *
  * Hex0 Format:
@@ -20,90 +21,356 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <string.h>
+#include <stdarg.h>
 #include "mach2hex0.h"
 
-/* Check if the C compiler supports '__builtin_bswap*' family builtins */
+/* Detect C Compiler '__has_builtin' support */
 #if defined(__has_builtin)
-#define hex0_has_builtin(builtin) __has_builtin(__builtin_##builtin)
+#define CC_has_builtin(builtin) __has_builtin(__builtin_##builtin)
 #else
-#define hex0_has_builtin(builtin) 0
+#define CC_has_builtin(builtin) 0
 #endif
 
+/* Detect C Compiler '__has_attribute' builtin support */
 #if defined(__has_attribute)
-#define hex0_has_attribute(attribute) __has_attribute(attribute)
+#define CC_has_attribute(attribute) __has_attribute(attribute)
 #else
-#define hex0_has_attribute(attribute) 0
+#define CC_has_attribute(attribute) 0
 #endif
 
-/* Swap uint16_t endianess */
-#if hex0_has_builtin(bswap16) || defined(__GNUC__)
-#define hex0_bswap16(val) __builtin_bswap16((uint16_t)val)
+/* Detect C Compiler 'noreturn' attribute support */
+#if __STDC_VERSION__ >= 202311L
+#define CC_noreturn [[noreturn]]
+#elif __STDC_VERSION__ >= 201112L
+#define CC_noreturn _Noreturn
+#elif CC_has_attribute(noreturn) || defined(__GNUC__) || defined(__TINYC__)
+#define CC_noreturn __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define CC_noreturn __declspec(noreturn)
 #else
-static inline uint16_t hex0_bswap16(uint16_t val) {
+#define CC_noreturn
+#endif
+
+/* Detect C Compiler '__builtin_bswap16' support */
+#if CC_has_builtin(bswap16) || defined(__GNUC__)
+#define CC_bswap16(val) __builtin_bswap16((uint16_t)val)
+#else
+static inline uint16_t CC_bswap16(uint16_t val) {
     return (uint16_t)((val & UINT16_C(0xFF00)) >> 8) |
            (uint16_t)((val & UINT16_C(0x00FF)) << 8);
 }
 #endif
 
-/* Swap uint32_t endianess */
-#if hex0_has_builtin(bswap32) || defined(__GNUC__)
-#define hex0_bswap32(val) __builtin_bswap32((uint32_t)val)
+/* Detect C Compiler '__builtin_bswap32' support */
+#if CC_has_builtin(bswap32) || defined(__GNUC__)
+#define CC_bswap32(val) __builtin_bswap32((uint32_t)val)
 #else
-static inline uint32_t hex0_bswap32(uint32_t val) {
-    return (uint32_t)hex0_bswap16((uint16_t)((val & UINT32_C(0x0000FFFF)) >>  0)) << 16 |
-           (uint32_t)hex0_bswap16((uint16_t)((val & UINT32_C(0xFFFF0000)) >> 16)) >>  0;
+static inline uint32_t CC_bswap32(uint32_t val) {
+    return
+    (uint32_t)CC_bswap16((uint16_t)((val & UINT32_C(0x0000FFFF)) >>  0)) << 16 |
+    (uint32_t)CC_bswap16((uint16_t)((val & UINT32_C(0xFFFF0000)) >> 16)) >>  0;
 }
 #endif
 
-/* Swap uint64_t endianess */
-#if hex0_has_builtin(bswap64) || defined(__GNUC__)
-#define hex0_bswap64(val) __builtin_bswap64((uint64_t)val)
+/* Detect C Compiler '__builtin_bswap64' support */
+#if CC_has_builtin(bswap64) || defined(__GNUC__)
+#define CC_bswap64(val) __builtin_bswap64((uint64_t)val)
 #else
-static inline uint64_t hex0_bswap64(uint64_t val) {
-    return (uint64_t)hex0_bswap32((uint32_t)((val & UINT64_C(0x00000000FFFFFFFF)) >>  0)) << 32 |
-           (uint64_t)hex0_bswap32((uint32_t)((val & UINT64_C(0xFFFFFFFF00000000)) >> 32)) >>  0;
+static inline uint64_t CC_bswap64(uint64_t val) {
+    return 
+    (uint64_t)CC_bswap32((uint32_t)((val & UINT64_C(0x00000000FFFFFFFF)) >>  0)) << 32 |
+    (uint64_t)CC_bswap32((uint32_t)((val & UINT64_C(0xFFFFFFFF00000000)) >> 32)) >>  0;
 }
 #endif
 
-/* Convert values between little-endian and big-endian */
+/* Helpers for conversion between little-endian <=> big-endian
+ * OBS: Assumes mach-o components are encoded in little-endian */
 #if defined(_MSC_VER) || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define hex0_u16be(val) hex0_bswap16(val)
-#define hex0_u32be(val) hex0_bswap32(val)
-#define hex0_u64be(val) hex0_bswap64(val)
-#define hex0_u16le(val) val
-#define hex0_u32le(val) val
-#define hex0_u64le(val) val
+#define to_u16be(val) CC_bswap16(val)
+#define to_u32be(val) CC_bswap32(val)
+#define to_u64be(val) CC_bswap64(val)
+#define to_u16le(val) ((uint16_t)(val))
+#define to_u32le(val) ((uint32_t)(val))
+#define to_u64le(val) ((uint64_t)(val))
 #else
-#define hex0_u16be(val) val
-#define hex0_u32be(val) val
-#define hex0_u64be(val) val
-#define hex0_u16le(val) hex0_bswap16(val)
-#define hex0_u32le(val) hex0_bswap32(val)
-#define hex0_u64le(val) hex0_bswap64(val)
+#define to_u16be(val) ((uint16_t)(val))
+#define to_u32be(val) ((uint32_t)(val))
+#define to_u64be(val) ((uint64_t)(val))
+#define to_u16le(val) CC_bswap16(val)
+#define to_u32le(val) CC_bswap32(val)
+#define to_u64le(val) CC_bswap64(val)
 #endif
 
-/* Store the string representation of Mach-O Constants */
-typedef struct macho_entry_t {
-    uint32_t flag;
+/* Store the string name of a raw Mach-O Constant */
+typedef struct const_info_t {
+    uint32_t value;
     const char *name;
     const char *desc;
-} macho_entry_t;
+} const_info_t;
 
 /*
- * String representation and description of Mach-O Constants.
+ * String representation and description of Mach-O constants.
  */
-#define entry(n,d) ((macho_entry_t){ .flag = hex0_u32le((uint32_t)(n)), .name = #n, .desc = d })
+#define entry(n,d) ((const_info_t){ .value = to_u32le((uint32_t)(n)), .name = #n, .desc = d })
 
-/* First 4 bytes of any Mach-o file */
-static macho_entry_t mach_magics_s[4] = {
+/* Mach-O MAGIC (first 4 bytes of any mach-o file) */
+static const_info_t mach_magics_s[4] = {
     entry(MH_MAGIC,                    "The mach magic number (32-bit little-endian)"),
     entry(MH_MAGIC_64,                 "The mach magic number (64-bit little-endian)"),
     entry(MH_CIGAM,                    "The mach magic number (32-bit big-endian)"),
     entry(MH_CIGAM_64,                 "The mach magic number (64-bit big-endian)")
 };
 
-/* All known mach-o Load Commands */
-static macho_entry_t load_commands_s[54] = {
+/* CPU TYPES ( mach_header->cputype ) */
+static const_info_t cputypes_s[16] = {
+    entry(CPU_TYPE_ANY,       NULL), /* 0xFFFFFFFF */
+    entry(CPU_TYPE_VAX,       NULL), /* 0x00000001 */
+    entry(CPU_TYPE_MC680x0,   NULL), /* 0x00000006 */
+    entry(CPU_TYPE_X86,       NULL), /* 0x00000007 */
+    entry(CPU_TYPE_I386,      NULL), /* 0x00000007 (alias to x86) */
+    entry(CPU_TYPE_X86_64,    NULL), /* 0x01000007 */
+    entry(CPU_TYPE_MC98000,   NULL), /* 0x0000000A */
+    entry(CPU_TYPE_HPPA,      NULL), /* 0x0000000B */
+    entry(CPU_TYPE_ARM,       NULL), /* 0x0000000C */
+    entry(CPU_TYPE_ARM64,     NULL), /* 0x0100000C */
+    entry(CPU_TYPE_ARM64_32,  NULL), /* 0x0200000C */
+    entry(CPU_TYPE_MC88000,   NULL), /* 0x0000000D */
+    entry(CPU_TYPE_SPARC,     NULL), /* 0x0000000E */
+    entry(CPU_TYPE_I860,      NULL), /* 0x0000000F */
+    entry(CPU_TYPE_POWERPC,   NULL), /* 0x00000012 */
+    entry(CPU_TYPE_POWERPC64, NULL)  /* 0x01000012 */
+};
+
+/* VAX CPU SUBTYPES ( mach_header->cpusubtype ) */
+static const_info_t cpusubtypes_vax_s[13] = {
+    entry(CPU_SUBTYPE_VAX_ALL, NULL), /* 0x00 */
+    entry(CPU_SUBTYPE_VAX780,  NULL), /* 0x01 */
+    entry(CPU_SUBTYPE_VAX785,  NULL), /* 0x02 */
+    entry(CPU_SUBTYPE_VAX750,  NULL), /* 0x03 */
+    entry(CPU_SUBTYPE_VAX730,  NULL), /* 0x04 */
+    entry(CPU_SUBTYPE_UVAXI,   NULL), /* 0x05 */
+    entry(CPU_SUBTYPE_UVAXII,  NULL), /* 0x06 */
+    entry(CPU_SUBTYPE_VAX8200, NULL), /* 0x07 */
+    entry(CPU_SUBTYPE_VAX8500, NULL), /* 0x08 */
+    entry(CPU_SUBTYPE_VAX8600, NULL), /* 0x09 */
+    entry(CPU_SUBTYPE_VAX8650, NULL), /* 0x0A */
+    entry(CPU_SUBTYPE_VAX8800, NULL), /* 0x0B */
+    entry(CPU_SUBTYPE_UVAXIII, NULL), /* 0x0C */
+};
+/* MC680x0 CPU SUBTYPES */
+static const_info_t cpusubtypes_mc680x0_s[4] = {
+    entry(CPU_SUBTYPE_MC68030,      NULL),     /* 0x01 */
+    entry(CPU_SUBTYPE_MC68040,      "compat"), /* 0x02 */
+    entry(CPU_SUBTYPE_MC68030_ONLY, NULL),     /* 0x03 */
+    entry(CPU_SUBTYPE_MC680x0_ALL,  NULL)      /* 0x01 */
+};
+/* I386 (x86) CPU SUBTYPES */
+static const_info_t cpusubtypes_x86_s[22] = {
+    entry(CPU_SUBTYPE_XEON_MP,         NULL),
+    entry(CPU_SUBTYPE_XEON,            NULL),
+    entry(CPU_SUBTYPE_ITANIUM_2,       NULL),
+    entry(CPU_SUBTYPE_ITANIUM,         NULL),
+    entry(CPU_SUBTYPE_PENTIUM_4_M,     NULL),
+    entry(CPU_SUBTYPE_PENTIUM_4,       NULL),
+    entry(CPU_SUBTYPE_PENTIUM_M,       NULL),
+    entry(CPU_SUBTYPE_PENTIUM_3_XEON,  NULL),
+    entry(CPU_SUBTYPE_PENTIUM_3_M,     NULL),
+    entry(CPU_SUBTYPE_PENTIUM_3,       NULL),
+    entry(CPU_SUBTYPE_CELERON_MOBILE,  NULL),
+    entry(CPU_SUBTYPE_CELERON,         NULL),
+    entry(CPU_SUBTYPE_PENTII_M5,       NULL),
+    entry(CPU_SUBTYPE_PENTII_M3,       NULL),
+    entry(CPU_SUBTYPE_PENTPRO,         NULL),
+    entry(CPU_SUBTYPE_PENT,            NULL),
+    entry(CPU_SUBTYPE_586,             NULL),
+    entry(CPU_SUBTYPE_486SX,           NULL),
+    entry(CPU_SUBTYPE_486,             NULL),
+    entry(CPU_SUBTYPE_386,             NULL),
+    entry(CPU_SUBTYPE_I386_ALL,        NULL),
+    entry(CPU_SUBTYPE_INTEL_MODEL_ALL, NULL)
+};
+/* X86_64 CPU SUBTYPES */
+static const_info_t cpusubtypes_x86_64_s[3] = {
+    entry(CPU_SUBTYPE_X86_64_H,   "Haswell feature subset"),
+    entry(CPU_SUBTYPE_X86_ARCH1,  NULL),
+    entry(CPU_SUBTYPE_X86_64_ALL, NULL)
+};
+/* ARM CPU SUBTYPES */
+static const_info_t cpusubtypes_arm32_s[17] = {
+    entry(CPU_SUBTYPE_ARM_V8_1M_MAIN, NULL),
+    entry(CPU_SUBTYPE_ARM_V8M_BASE,   NULL),
+    entry(CPU_SUBTYPE_ARM_V8M_MAIN,   NULL),
+    entry(CPU_SUBTYPE_ARM_V8M,        NULL),
+    entry(CPU_SUBTYPE_ARM_V7EM,       NULL),
+    entry(CPU_SUBTYPE_ARM_V7M,        NULL),
+    entry(CPU_SUBTYPE_ARM_V6M,        NULL),
+    entry(CPU_SUBTYPE_ARM_V8,         NULL),
+    entry(CPU_SUBTYPE_ARM_V7K,        NULL),
+    entry(CPU_SUBTYPE_ARM_V7S,        NULL),
+    entry(CPU_SUBTYPE_ARM_V7F,        NULL),
+    entry(CPU_SUBTYPE_ARM_V7,         NULL),
+    entry(CPU_SUBTYPE_ARM_XSCALE,     NULL),
+    entry(CPU_SUBTYPE_ARM_V5TEJ,      NULL),
+    entry(CPU_SUBTYPE_ARM_V6,         NULL),
+    entry(CPU_SUBTYPE_ARM_V4T,        NULL),
+    entry(CPU_SUBTYPE_ARM_ALL,        NULL)
+};
+/* ARM64 CPU SUBTYPES */
+static const_info_t cpusubtypes_arm64_s[3] = {
+    entry(CPU_SUBTYPE_ARM64E,    NULL),
+    entry(CPU_SUBTYPE_ARM64_V8,  NULL),
+    entry(CPU_SUBTYPE_ARM64_ALL, NULL)
+};
+/* ARM64_32 CPU SUBTYPES */
+static const_info_t cpusubtypes_arm64_32_s[2] = {
+    entry(CPU_SUBTYPE_ARM64_32_V8,  NULL),
+    entry(CPU_SUBTYPE_ARM64_32_ALL, NULL)
+};
+/* MC98000 (PowerPC) CPU SUBTYPES */
+static const_info_t cpusubtypes_mc98000_s[2] = {
+    entry(CPU_SUBTYPE_MC98601,   NULL),
+    entry(CPU_SUBTYPE_MC98000_ALL,  NULL)
+};
+/* MC88000 CPU SUBTYPES */
+static const_info_t cpusubtypes_mc88000_s[3] = {
+    entry(CPU_SUBTYPE_MC88110,      NULL),
+    entry(CPU_SUBTYPE_MC88100,      NULL),
+    entry(CPU_SUBTYPE_MC88000_ALL,  NULL)
+};
+/* Mips CPU SUBTYPES */
+static const_info_t cpusubtypes_mips_s[8] = {
+    entry(CPU_SUBTYPE_MIPS_R3000,  NULL),
+    entry(CPU_SUBTYPE_MIPS_R3000a, "3max"),
+    entry(CPU_SUBTYPE_MIPS_R2000,  NULL),
+    entry(CPU_SUBTYPE_MIPS_R2000a, "pmax"),
+    entry(CPU_SUBTYPE_MIPS_R2800,  NULL),
+    entry(CPU_SUBTYPE_MIPS_R2600,  NULL),
+    entry(CPU_SUBTYPE_MIPS_R2300,  NULL),
+    entry(CPU_SUBTYPE_MIPS_ALL,    NULL)
+};
+/* HPPA CPU subtypes */
+static const_info_t cpusubtypes_hppa_s[3] = {
+    entry(CPU_SUBTYPE_HPPA_7100LC,  NULL),
+    entry(CPU_SUBTYPE_HPPA_7100,    "compat"),
+    entry(CPU_SUBTYPE_HPPA_ALL,     NULL)
+};
+/* SPARC CPU SUBTYPES */
+static const_info_t cpusubtypes_sparc_s[1] = {
+    entry(CPU_SUBTYPE_SPARC_ALL,     NULL)
+};
+/* I860 CPU SUBTYPES */
+static const_info_t cpusubtypes_i860_s[2] = {
+    entry(CPU_SUBTYPE_I860_860, NULL),
+    entry(CPU_SUBTYPE_I860_ALL, NULL)
+};
+/* PowerPC CPU SUBTYPES */
+static const_info_t cpusubtypes_powerpc_s[13] = {
+    entry(CPU_SUBTYPE_POWERPC_970,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_7450,  NULL),
+    entry(CPU_SUBTYPE_POWERPC_7400,  NULL),
+    entry(CPU_SUBTYPE_POWERPC_750,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_620,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_604e,  NULL),
+    entry(CPU_SUBTYPE_POWERPC_604,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_603ev, NULL),
+    entry(CPU_SUBTYPE_POWERPC_603e,  NULL),
+    entry(CPU_SUBTYPE_POWERPC_603,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_602,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_601,   NULL),
+    entry(CPU_SUBTYPE_POWERPC_ALL,   NULL)
+};
+
+/* Mach-O FILE TYPE */
+static const_info_t filetypes_s[11] = {
+    entry(MH_OBJECT,      "relocatable object file"),
+    entry(MH_EXECUTE,     "demand paged executable file"),
+    entry(MH_FVMLIB,      "fixed VM shared library file"),
+    entry(MH_CORE,        "core file"),
+    entry(MH_PRELOAD,     "preloaded executable file"),
+    entry(MH_DYLIB,       "dynamically bound shared library"),
+    entry(MH_DYLINKER,    "dynamic link editor"),
+    entry(MH_BUNDLE,      "dynamically bound bundle file"),
+    entry(MH_DYLIB_STUB,  "shared library stub for static linking only, no section contents"),
+    entry(MH_DSYM,        "companion file with only debug sections"),
+    entry(MH_KEXT_BUNDLE, "x86_64 kexts")
+};
+
+/* Mach-o FILE FLAGS */
+static const_info_t headerflags_s[29] = {
+    entry(MH_NOUNDEFS,                      "the object file has no undefined references"),
+    entry(MH_INCRLINK,                      "the object file is the output of an incremental link "
+                                            "against a base file and can't be link edited again"),
+    entry(MH_DYLDLINK,                      "the object file is input for the dynamic linker and "
+                                            "can't be statically link edited again"),
+    entry(MH_BINDATLOAD,                    "the object file's undefined references are bound by "
+                                            "the dynamic linker when loaded."),
+    entry(MH_PREBOUND,                      "the file has its dynamic undefined references "
+                                            "prebound."),
+    entry(MH_SPLIT_SEGS,                    "the file has its read-only and read-write segments "
+                                            "split"),
+    entry(MH_LAZY_INIT,                     "the shared library init routine is to be run lazily "
+                                            "via catching memory faults to its writeable segments "
+                                            "(obsolete)"),
+    entry(MH_TWOLEVEL,                      "the image is using two-level name space bindings"),
+    entry(MH_FORCE_FLAT,                    "the executable is forcing all images to use flat "
+                                            "name space bindings"),
+    entry(MH_NOMULTIDEFS,                   "this umbrella guarantees no multiple definitions of "
+                                            "symbols in its sub-images so the two-level namespace "
+                                            "hints can always be used."),
+    entry(MH_NOFIXPREBINDING,               "do not have dyld notify the prebinding agent about "
+                                            "this executable"),
+    entry(MH_PREBINDABLE,                   "the binary is not prebound but can have its "
+                                            "prebinding redone. only used when MH_PREBOUND is not "
+                                            "set."),
+    entry(MH_ALLMODSBOUND,                  "indicates that this binary binds to all two-level "
+                                            "namespace modules of its dependent libraries. only "
+                                            "used when MH_PREBINDABLE and MH_TWOLEVEL are both "
+                                            "set."),
+    entry(MH_SUBSECTIONS_VIA_SYMBOLS,       "safe to divide up the sections into sub-sections via "
+                                            "symbols for dead code stripping"),
+    entry(MH_CANONICAL,                     "the binary has been canonicalized via the unprebind "
+                                            "operation"),
+    entry(MH_WEAK_DEFINES,                  "the final linked image contains external weak "
+                                            "symbols"),
+    entry(MH_BINDS_TO_WEAK,                 "the final linked image uses weak symbols"),
+    entry(MH_ALLOW_STACK_EXECUTION,         "When this bit is set, all stacks in the task will be "
+                                            "given stack execution privilege. Only used in "
+                                            "MH_EXECUTE filetypes."),
+    entry(MH_ROOT_SAFE,                     "When this bit is set, the binary declares it is safe "
+                                            "for use in processes with uid zero"),
+    entry(MH_SETUID_SAFE,                   "When this bit is set, the binary declares it is safe "
+                                            "for use in processes when issetugid() is true"),
+    entry(MH_NO_REEXPORTED_DYLIBS,          "When this bit is set on a dylib, the static linker "
+                                            "does not need to examine dependent dylibs to see if "
+                                            "any are re-exported"),
+    entry(MH_PIE,                           "When this bit is set, the OS will load the main "
+                                            "executable at a random address. Only used in "
+                                            "MH_EXECUTE filetypes."),
+    entry(MH_DEAD_STRIPPABLE_DYLIB,         "Only for use on dylibs.  When linking against a "
+                                            "dylib that has this bit set, the static linker will "
+                                            "automatically not create a LC_LOAD_DYLIB load "
+                                            "command to the dylib if no symbols are being "
+                                            "referenced from the dylib."),
+    entry(MH_HAS_TLV_DESCRIPTORS,           "Contains a section of type S_THREAD_LOCAL_VARIABLES"),
+    entry(MH_NO_HEAP_EXECUTION,             "When this bit is set, the OS will run the main "
+                                            "executable with a non-executable heap even on "
+                                            "platforms (e.g. x86) that don't require it. Only "
+                                            "used in MH_EXECUTE filetypes."),
+    entry(MH_APP_EXTENSION_SAFE,            "The code was linked for use in an application "
+                                            "extension."),
+    entry(MH_NLIST_OUTOFSYNC_WITH_DYLDINFO, "The external symbols listed in the nlist symbol "
+                                            "table do not include all the symbols listed in "
+                                            "the dyld info."),
+    entry(MH_SIM_SUPPORT,                   "Allow LC_MIN_VERSION_MACOS and LC_BUILD_VERSION load "
+                                            "commands with the platforms macOS, iOSMac, "
+                                            "iOSSimulator, tvOSSimulator and watchOSSimulator."),
+    entry(MH_DYLIB_IN_CACHE,                "Only for use on dylibs. When this bit is set, the "
+                                            "dylib is part of the dyld shared cache, rather than "
+                                            "loose in the filesystem.")
+};
+
+/* Mach-O LOAD COMMANDS (after Mach-O header) */
+static const_info_t load_commands_s[54] = {
     /* Constants for the cmd field of all load commands, the type */
     entry(LC_SEGMENT,                  "segment of this file to be mapped"),
     entry(LC_SYMTAB,                   "link-edit gdb symbol table info (obsolete)"),
@@ -129,7 +396,8 @@ static macho_entry_t load_commands_s[54] = {
     entry(LC_SUB_LIBRARY,              "sub library"),
     entry(LC_TWOLEVEL_HINTS,           "two-level namespace lookup hints"),
     entry(LC_PREBIND_CKSUM,            "prebind checksum"),
-    entry(LC_LOAD_WEAK_DYLIB,          "load a dynamically linked shared library that is allowed to be missing (all symbols are weak imported)."),
+    entry(LC_LOAD_WEAK_DYLIB,          "load a dynamically linked shared library that is allowed "
+                                       "to be missing (all symbols are weak imported)."),
     entry(LC_SEGMENT_64,               "64-bit segment of this file to be mapped"),
     entry(LC_ROUTINES_64,              "64-bit image routines"),
     entry(LC_UUID,                     "the uuid"),
@@ -161,243 +429,15 @@ static macho_entry_t load_commands_s[54] = {
     entry(LC_DYLD_CHAINED_FIXUPS,      "used with linkedit_data_command"),
     entry(LC_FILESET_ENTRY,            "used with fileset_entry_command")
 };
-
-/* Mach-o header CPU types */
-static macho_entry_t cputypes_s[16] = {
-    entry(CPU_TYPE_POWERPC64, NULL),
-    entry(CPU_TYPE_POWERPC,   NULL),
-    entry(CPU_TYPE_I860,      NULL),
-    entry(CPU_TYPE_SPARC,     NULL),
-    entry(CPU_TYPE_MC88000,   NULL),
-    entry(CPU_TYPE_ARM64_32,  NULL),
-    entry(CPU_TYPE_ARM64,     NULL),
-    entry(CPU_TYPE_ARM,       NULL),
-    entry(CPU_TYPE_HPPA,      NULL),
-    entry(CPU_TYPE_MC98000,   NULL),
-    entry(CPU_TYPE_X86_64,    NULL),
-    entry(CPU_TYPE_I386,      NULL),
-    entry(CPU_TYPE_X86,       NULL),
-    entry(CPU_TYPE_MC680x0,   NULL),
-    entry(CPU_TYPE_VAX,       NULL),
-    entry(CPU_TYPE_ANY,       NULL)
-};
-
-/* ARM cpu subtypes */
-static macho_entry_t cpusubtypes_s[17] = {
-    entry(CPU_SUBTYPE_ARM_V8_1M_MAIN, NULL),
-    entry(CPU_SUBTYPE_ARM_V8M_BASE,   NULL),
-    entry(CPU_SUBTYPE_ARM_V8M_MAIN,   NULL),
-    entry(CPU_SUBTYPE_ARM_V8M,        NULL),
-    entry(CPU_SUBTYPE_ARM_V7EM,       NULL),
-    entry(CPU_SUBTYPE_ARM_V7M,        NULL),
-    entry(CPU_SUBTYPE_ARM_V6M,        NULL),
-    entry(CPU_SUBTYPE_ARM_V8,         NULL),
-    entry(CPU_SUBTYPE_ARM_V7K,        NULL),
-    entry(CPU_SUBTYPE_ARM_V7S,        NULL),
-    entry(CPU_SUBTYPE_ARM_V7F,        NULL),
-    entry(CPU_SUBTYPE_ARM_V7,         NULL),
-    entry(CPU_SUBTYPE_ARM_XSCALE,     NULL),
-    entry(CPU_SUBTYPE_ARM_V5TEJ,      NULL),
-    entry(CPU_SUBTYPE_ARM_V6,         NULL),
-    entry(CPU_SUBTYPE_ARM_V4T,        NULL),
-    entry(CPU_SUBTYPE_ARM_ALL,        NULL)
-};
-
-/* ARM64 cpu subtypes */
-static macho_entry_t cpusubtypes_arm64_s[3] = {
-    entry(CPU_SUBTYPE_ARM64E,    NULL),
-    entry(CPU_SUBTYPE_ARM64_V8,  NULL),
-    entry(CPU_SUBTYPE_ARM64_ALL, NULL)
-};
-
-/* ARM64_32 cpu subtypes */
-static macho_entry_t cpusubtypes_arm64_32_s[2] = {
-    entry(CPU_SUBTYPE_ARM64_32_V8,  NULL),
-    entry(CPU_SUBTYPE_ARM64_32_ALL, NULL)
-};
-
-/* I386 cpu subtypes */
-static macho_entry_t cpusubtypes_i386_s[22] = {
-    entry(CPU_SUBTYPE_XEON_MP,         NULL),
-    entry(CPU_SUBTYPE_XEON,            NULL),
-    entry(CPU_SUBTYPE_ITANIUM_2,       NULL),
-    entry(CPU_SUBTYPE_ITANIUM,         NULL),
-    entry(CPU_SUBTYPE_PENTIUM_4_M,     NULL),
-    entry(CPU_SUBTYPE_PENTIUM_4,       NULL),
-    entry(CPU_SUBTYPE_PENTIUM_M,       NULL),
-    entry(CPU_SUBTYPE_PENTIUM_3_XEON,  NULL),
-    entry(CPU_SUBTYPE_PENTIUM_3_M,     NULL),
-    entry(CPU_SUBTYPE_PENTIUM_3,       NULL),
-    entry(CPU_SUBTYPE_CELERON_MOBILE,  NULL),
-    entry(CPU_SUBTYPE_CELERON,         NULL),
-    entry(CPU_SUBTYPE_PENTII_M5,       NULL),
-    entry(CPU_SUBTYPE_PENTII_M3,       NULL),
-    entry(CPU_SUBTYPE_PENTPRO,         NULL),
-    entry(CPU_SUBTYPE_PENT,            NULL),
-    entry(CPU_SUBTYPE_586,             NULL),
-    entry(CPU_SUBTYPE_486SX,           NULL),
-    entry(CPU_SUBTYPE_486,             NULL),
-    entry(CPU_SUBTYPE_386,             NULL),
-    entry(CPU_SUBTYPE_I386_ALL,        NULL),
-    entry(CPU_SUBTYPE_INTEL_MODEL_ALL, NULL)
-};
-
-/* X86 cpu subtypes. */
-static macho_entry_t cpusubtypes_x86_s[4] = {
-    entry(CPU_SUBTYPE_X86_64_H,   "Haswell feature subset"),
-    entry(CPU_SUBTYPE_X86_ARCH1,  NULL),
-    entry(CPU_SUBTYPE_X86_ALL,    NULL),
-    entry(CPU_SUBTYPE_X86_64_ALL, NULL)
-};
-
-/* Mach-o header file type, ex:
- * - MH_EXECUTE for executable files
- * = MH_DYLIB for *.dylib files */
-static macho_entry_t filetypes_s[11] = {
-    { .flag = MH_OBJECT,
-      .name = "MH_OBJECT",
-      .desc = "relocatable object file" },
-    { .flag = MH_EXECUTE,
-      .name = "MH_EXECUTE",
-      .desc = "demand paged executable file" },
-    { .flag = MH_FVMLIB,
-      .name = "MH_FVMLIB",
-      .desc = "fixed VM shared library file" },
-    { .flag = MH_CORE,
-      .name = "MH_CORE",
-      .desc = "core file" },
-    { .flag = MH_PRELOAD,
-      .name = "MH_PRELOAD",
-      .desc = "preloaded executable file" },
-    { .flag = MH_DYLIB,
-      .name = "MH_DYLIB",
-      .desc = "dynamically bound shared library" },
-    { .flag = MH_DYLINKER,
-      .name = "MH_DYLINKER",
-      .desc = "dynamic link editor" },
-    { .flag = MH_BUNDLE,
-      .name = "MH_BUNDLE",
-      .desc = "dynamically bound bundle file" },
-    { .flag = MH_DYLIB_STUB,
-      .name = "MH_DYLIB_STUB",
-      .desc = "shared library stub for static linking only, no section contents" },
-    { .flag = MH_DSYM,
-      .name = "MH_DSYM",
-      .desc = "companion file with only debug sections" },
-    { .flag = MH_KEXT_BUNDLE,
-      .name = "MH_KEXT_BUNDLE",
-      .desc = "x86_64 kexts" }
-};
-
-/* Bitflags used in Mach-o Header */
-static macho_entry_t headerflags_s[29] = {
-    { .flag = MH_NOUNDEFS,
-      .name = "MH_NOUNDEFS",
-      .desc = "the object file has no undefined references" },
-    { .flag = MH_INCRLINK,
-      .name = "MH_INCRLINK",
-      .desc = "the object file is the output of an incremental link against a base file and can't be link edited again" },
-    { .flag = MH_DYLDLINK,
-      .name = "MH_DYLDLINK",
-      .desc = "the object file is input for the dynamic linker and can't be statically link edited again" },
-    { .flag = MH_BINDATLOAD,
-      .name = "MH_BINDATLOAD",
-      .desc = "the object file's undefined references are bound by the dynamic linker when loaded." },
-    { .flag = MH_PREBOUND,
-      .name = "MH_PREBOUND",
-      .desc = "the file has its dynamic undefined references prebound." },
-    { .flag = MH_SPLIT_SEGS,
-      .name = "MH_SPLIT_SEGS",
-      .desc = "the file has its read-only and read-write segments split" },
-    { .flag = MH_LAZY_INIT,
-      .name = "MH_LAZY_INIT",
-      .desc = "the shared library init routine is to be run lazily via catching memory faults to its writeable segments (obsolete)" },
-    { .flag = MH_TWOLEVEL,
-      .name = "MH_TWOLEVEL",
-      .desc = "the image is using two-level name space bindings" },
-    { .flag = MH_FORCE_FLAT,
-      .name = "MH_FORCE_FLAT",
-      .desc = "the executable is forcing all images to use flat name space bindings" },
-    { .flag = MH_NOMULTIDEFS,
-      .name = "MH_NOMULTIDEFS",
-      .desc = "this umbrella guarantees no multiple definitions of symbols in its sub-images so the two-level namespace hints can always be used." },
-    { .flag = MH_NOFIXPREBINDING,
-      .name = "MH_NOFIXPREBINDING",
-      .desc = "do not have dyld notify the prebinding agent about this executable" },
-    { .flag = MH_PREBINDABLE,
-      .name = "MH_PREBINDABLE",
-      .desc = "the binary is not prebound but can have its prebinding redone. only used when MH_PREBOUND is not set." },
-    { .flag = MH_ALLMODSBOUND,
-      .name = "MH_ALLMODSBOUND",
-      .desc = "indicates that this binary binds to all two-level namespace modules of its dependent libraries. only used when MH_PREBINDABLE and MH_TWOLEVEL are both set." },
-    { .flag = MH_SUBSECTIONS_VIA_SYMBOLS,
-      .name = "MH_SUBSECTIONS_VIA_SYMBOLS",
-      .desc = "safe to divide up the sections into sub-sections via symbols for dead code stripping" },
-    { .flag = MH_CANONICAL,
-      .name = "MH_CANONICAL",
-      .desc = "the binary has been canonicalized via the unprebind operation" },
-    { .flag = MH_WEAK_DEFINES,
-      .name = "MH_WEAK_DEFINES",
-      .desc = "the final linked image contains external weak symbols" },
-    { .flag = MH_BINDS_TO_WEAK,
-      .name = "MH_BINDS_TO_WEAK",
-      .desc = "the final linked image uses weak symbols" },
-    { .flag = MH_ALLOW_STACK_EXECUTION,
-      .name = "MH_ALLOW_STACK_EXECUTION",
-      .desc = "When this bit is set, all stacks in the task will be given stack execution privilege. Only used in MH_EXECUTE filetypes." },
-    { .flag = MH_ROOT_SAFE,
-      .name = "MH_ROOT_SAFE",
-      .desc = "When this bit is set, the binary declares it is safe for use in processes with uid zero" },
-    { .flag = MH_SETUID_SAFE,
-      .name = "MH_SETUID_SAFE",
-      .desc = "When this bit is set, the binary declares it is safe for use in processes when issetugid() is true" },
-    { .flag = MH_NO_REEXPORTED_DYLIBS,
-      .name = "MH_NO_REEXPORTED_DYLIBS",
-      .desc = "When this bit is set on a dylib, the static linker does not need to examine dependent dylibs to see if any are re-exported" },
-    { .flag = MH_PIE,
-      .name = "MH_PIE",
-      .desc = "When this bit is set, the OS will load the main executable at a random address. Only used in MH_EXECUTE filetypes." },
-    { .flag = MH_DEAD_STRIPPABLE_DYLIB,
-      .name = "MH_DEAD_STRIPPABLE_DYLIB",
-      .desc = "Only for use on dylibs.  When linking against a dylib that has this bit set, the static linker will automatically not create a LC_LOAD_DYLIB load command to the dylib if no symbols are being referenced from the dylib." },
-    { .flag = MH_HAS_TLV_DESCRIPTORS,
-      .name = "MH_HAS_TLV_DESCRIPTORS",
-      .desc = "Contains a section of type S_THREAD_LOCAL_VARIABLES" },
-    { .flag = MH_NO_HEAP_EXECUTION,
-      .name = "MH_NO_HEAP_EXECUTION",
-      .desc = "When this bit is set, the OS will run the main executable with a non-executable heap even on platforms (e.g. x86) that don't require it. Only used in MH_EXECUTE filetypes." },
-    { .flag = MH_APP_EXTENSION_SAFE,
-      .name = "MH_APP_EXTENSION_SAFE",
-      .desc = "The code was linked for use in an application extension." },
-    { .flag = MH_NLIST_OUTOFSYNC_WITH_DYLDINFO,
-      .name = "MH_NLIST_OUTOFSYNC_WITH_DYLDINFO",
-      .desc = "The external symbols listed in the nlist symbol table do not include all the symbols listed in the dyld info." },
-    { .flag = MH_SIM_SUPPORT,
-      .name = "MH_SIM_SUPPORT",
-      .desc = "Allow LC_MIN_VERSION_MACOS and LC_BUILD_VERSION load commands with the platforms macOS, iOSMac, iOSSimulator, tvOSSimulator and watchOSSimulator." },
-    { .flag = MH_DYLIB_IN_CACHE,
-      .name = "MH_DYLIB_IN_CACHE (x86_64 kexts)",
-      .desc = "Only for use on dylibs. When this bit is set, the dylib is part of the dyld shared cache, rather than loose in the filesystem." }
-};
 #undef entry // we no longer need this macro.
 
-/* Detect if the C compiler supports noreturn attribute */
-__attribute__((__noreturn__))
-#if __STDC_VERSION__ >= 202311L
-void fail(int code, const char* err) [[noreturn]];
-#elif __STDC_VERSION__ >= 201112L
-void fail(int code, const char* err) _Noreturn;
-#elif hex0_has_attribute(noreturn) || defined(__GNUC__) || defined(__TINYC__)
-void fail(int code, const char* err) __attribute__((noreturn));
-#elif defined(zig_msvc)
-void fail(int code, const char* err) __declspec(noreturn);
-#endif
-
-/* Fail and exit */
-void fail(int code, const char* err)
+/* Display error message then exit and exit */
+CC_noreturn void fail(int code, const char *err, ...);
+void fail(int code, const char *err, ...)
 {
-    fprintf(stderr, "[ERROR] %s\n", err);
-    exit((int)code);
+    va_list args;
+    vfprintf(stderr, err, args);
+    do { exit((int)code); } while(1);
 }
 
 /* Fast Integer Exponentiation Algorithm */
@@ -497,62 +537,145 @@ static const char* id2lc_command_name(uint32_t id)
 {
     int i = 0;
     for (i = 0; i < (sizeof(load_commands_s) / sizeof(load_commands_s[0])); i++)
-        if (load_commands_s[i].flag == id)
+        if (load_commands_s[i].value == id)
             return load_commands_s[i].name;
     return "<UNKNOWN>";
 }
 
+/* Retrieves the CPU TYPE string name, otherwise NULL */
+static const char* get_entry_name(const_info_t *array, size_t len, uint32_t id)
+{
+    size_t i;
+    for (i = 0; i < len; i++)
+        if (array[i].value == id)
+            return array[i].name;
+    return NULL;
+}
+
+/* Retrieves the CPU TYPE string name, otherwise NULL */
+inline static const char* get_entry_name_or_default(const_info_t *array, size_t len, uint32_t id)
+{
+    const char *name;
+    if ((name = get_entry_name(array, len, id))) return name;
+    else return "<UNKNOWN>";
+}
+
 /* Parses the Mach-o Header
  * TODO: add support to 32-bit headers */
-ssize_t parse_mach_header(uint8_t *buffer, size_t len, struct mach_header_64** out)
+ssize_t parse_mach_header(const uint8_t *buffer, size_t len, struct mach_header** out)
 {
     int i;
-    size_t flaglen;
+    size_t flaglen, cpu_subtypes_len;
     struct mach_header_64* header;
     const char *magic, *cputype, *cpusubtype, *filetype;
     char *headerflags, *ptr;
+    const_info_t *cpu_subtypes_arr;
+
+    // buffer must have at minium Mach-O Header size
     if (!buffer || !out || len < sizeof(struct mach_header_64))
         return ~1;
-    header = (struct mach_header_64*) buffer;
-    magic = cputype = cpusubtype = filetype = "<UNKNOWN>";
 
     // MAGIC
-    for (i = 0; i < (sizeof(mach_magics_s) / sizeof(mach_magics_s[0])); i++) {
-        if (header->magic == mach_magics_s[i].flag) {
-            magic = mach_magics_s[i].name;
+    header = (struct mach_header_64*) buffer;
+    switch (header->magic)
+    {
+        case MH_MAGIC_64:
+        case MH_CIGAM_64:
+            len = sizeof(struct mach_header_64);
             break;
-        }
+        case MH_MAGIC:
+        case MH_CIGAM:
+            len = sizeof(struct mach_header);
+            break;
+        default:
+            fail(1, "invalid mach-o magic: %08"PRIx32, to_u32be(header->magic));
     }
-
+    magic = get_entry_name_or_default(
+        mach_magics_s,
+        (sizeof(mach_magics_s) / sizeof(mach_magics_s[0])),
+        header->magic
+    );
+    
     // CPU TYPE
-    for (i = 0; i < (sizeof(cputypes_s) / sizeof(cputypes_s[0])); i++) {
-        if (header->cputype == cputypes_s[i].flag) {
-            cputype = cputypes_s[i].name;
-            break;
-        }
+    cputype = get_entry_name_or_default(
+        cputypes_s,
+        (sizeof(cputypes_s) / sizeof(cputypes_s[0])),
+        header->cputype
+    );
+    
+    // CPU SUBTYPES
+    switch (header->cputype)
+    {
+        case CPU_TYPE_VAX:
+        cpu_subtypes_arr = cpusubtypes_vax_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_vax_s) / sizeof(cpusubtypes_vax_s[0]));
+        break;
+        case CPU_TYPE_MC680x0:
+        cpu_subtypes_arr = cpusubtypes_mc680x0_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_mc680x0_s) / sizeof(cpusubtypes_mc680x0_s[0]));
+        break;
+        case CPU_TYPE_X86:
+        cpu_subtypes_arr = cpusubtypes_x86_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_x86_s) / sizeof(cpusubtypes_x86_s[0]));
+        break;
+        case CPU_TYPE_X86_64:
+        cpu_subtypes_arr = cpusubtypes_x86_64_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_x86_64_s) / sizeof(cpusubtypes_x86_64_s[0]));
+        break;
+        case CPU_TYPE_MC98000:
+        cpu_subtypes_arr = cpusubtypes_mc98000_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_mc98000_s) / sizeof(cpusubtypes_mc98000_s[0]));
+        break;
+        case CPU_TYPE_HPPA:
+        cpu_subtypes_arr = cpusubtypes_hppa_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_hppa_s) / sizeof(cpusubtypes_hppa_s[0]));
+        break;
+        case CPU_TYPE_ARM:
+        cpu_subtypes_arr = cpusubtypes_arm32_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_arm32_s) / sizeof(cpusubtypes_arm32_s[0]));
+        break;
+        case CPU_TYPE_ARM64:
+        cpu_subtypes_arr = cpusubtypes_arm64_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_arm64_s) / sizeof(cpusubtypes_arm64_s[0]));
+        break;
+        case CPU_TYPE_ARM64_32:
+        cpu_subtypes_arr = cpusubtypes_arm64_32_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_arm64_32_s) / sizeof(cpusubtypes_arm64_32_s[0]));
+        break;
+        case CPU_TYPE_MC88000:
+        cpu_subtypes_arr = cpusubtypes_mc88000_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_mc88000_s) / sizeof(cpusubtypes_mc88000_s[0]));
+        break;
+        case CPU_TYPE_SPARC:
+        cpu_subtypes_arr = cpusubtypes_sparc_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_sparc_s) / sizeof(cpusubtypes_sparc_s[0]));
+        break;
+        case CPU_TYPE_I860:
+        cpu_subtypes_arr = cpusubtypes_i860_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_i860_s) / sizeof(cpusubtypes_i860_s[0]));
+        break;
+        case CPU_TYPE_POWERPC:
+        case CPU_TYPE_POWERPC64:
+        cpu_subtypes_arr = cpusubtypes_powerpc_s;
+        cpu_subtypes_len = (sizeof(cpusubtypes_powerpc_s) / sizeof(cpusubtypes_powerpc_s[0]));
+        break;
+        default:
+        cpu_subtypes_arr = NULL;
+        cpu_subtypes_len = 0;
     }
-
-    // CPU TYPE
-    for (i = 0; i < (sizeof(cpusubtypes_s) / sizeof(cpusubtypes_s[0])); i++) {
-        if (header->cpusubtype == cpusubtypes_s[i].flag) {
-            cpusubtype = cpusubtypes_s[i].name;
-            break;
-        }
-    }
+    if (cpu_subtypes_arr != NULL && cpu_subtypes_len > 0)
+        cpusubtype = get_entry_name_or_default(cpu_subtypes_arr, cpu_subtypes_len, header->cpusubtype);
+    else
+        cpusubtype = "<UNKNOWN>";
 
     // FILE TYPE
-    for (i = 0; i < (sizeof(filetypes_s) / sizeof(filetypes_s[0])); i++) {
-        if (header->filetype == filetypes_s[i].flag) {
-            filetype = filetypes_s[i].name;
-            break;
-        }
-    }
+    filetype = get_entry_name_or_default(filetypes_s, (sizeof(filetypes_s) / sizeof(filetypes_s[0])), header->filetype);
 
     // -- FLAGS --
     headerflags = NULL;
     flaglen = 0;
     for (i = 0; i < (sizeof(headerflags_s) / sizeof(headerflags_s[0])); i++)
-        if (header->flags & headerflags_s[i].flag)
+        if (header->flags & headerflags_s[i].value)
             flaglen = flaglen + (flaglen > 0 ? 3 : 0) + strnlen(headerflags_s[i].name, 64);
 
     // Force 16-byte aligment
@@ -562,10 +685,13 @@ ssize_t parse_mach_header(uint8_t *buffer, size_t len, struct mach_header_64** o
 
     if (flaglen) {
         for (i = 0; i < (sizeof(headerflags_s) / sizeof(headerflags_s[0])); i++) {
-            if (header->flags & headerflags_s[i].flag) {
+            if (header->flags & headerflags_s[i].value) {
                 if (ptr != headerflags)
                     ptr += snprintf(ptr, flaglen - ((size_t)(ptr - headerflags)), " | ");
-                ptr += snprintf(ptr, flaglen - ((size_t)(ptr - headerflags)), "%s", headerflags_s[i].name);
+                ptr += snprintf(ptr,
+                    flaglen - ((size_t)(ptr - headerflags)),
+                    "%s",
+                    headerflags_s[i].name);
             }
         }
     } else {
@@ -583,18 +709,21 @@ ssize_t parse_mach_header(uint8_t *buffer, size_t len, struct mach_header_64** o
         "%08"PRIx32"         ;         filetype: %s\n"
         "%08"PRIx32"         ;            ncmds: %"PRIu32"\n"
         "%08"PRIx32"         ;       sizeofcmds: %"PRIu32"\n"
-        "%08"PRIx32"         ;            flags: %s\n"
-        "%08"PRIx32"         ;         reserved: %"PRIu32"\n",
-        hex0_u32be(header->magic),      magic,
-        hex0_u32be(header->cputype),    cputype,
-        hex0_u32be(header->cpusubtype), cpusubtype,
-        hex0_u32be(header->filetype),   filetype,
-        hex0_u32be(header->ncmds),      header->ncmds,
-        hex0_u32be(header->sizeofcmds), header->sizeofcmds,
-        hex0_u32be(header->flags),      headerflags,
-        hex0_u32be(header->reserved),   header->reserved);
-    *out = header;
-    return sizeof(struct mach_header_64);
+        "%08"PRIx32"         ;            flags: %s\n",
+        to_u32be(header->magic),      magic,
+        to_u32be(header->cputype),    cputype,
+        to_u32be(header->cpusubtype), cpusubtype,
+        to_u32be(header->filetype),   filetype,
+        to_u32be(header->ncmds),      header->ncmds,
+        to_u32be(header->sizeofcmds), header->sizeofcmds,
+        to_u32be(header->flags),      headerflags);
+    
+    if (len == sizeof(struct mach_header_64))
+        printf("%08"PRIx32"         ;         reserved: %"PRIu32"\n",
+            to_u32be(header->reserved), header->reserved);
+    
+    *out = (struct mach_header*)header;
+    return len;
 }
 
 /* Parses and print a single section from LC_SEGMENT_64 Command */
@@ -623,20 +752,20 @@ ssize_t parse_section_64(uint8_t *buffer, size_t len)
         "%08"PRIx32"         ;         reserved1: %"PRIu32"\n"
         "%08"PRIx32"         ;         reserved2: %"PRIu32"\n"
         "%08"PRIx32"         ;         reserved3: %"PRIu32"\n",
-        hex0_u64be(*(((uint64_t*)sec->sectname)+0)), sectname_cstr,
-        hex0_u64be(*(((uint64_t*)sec->sectname)+1)),
-        hex0_u64be(*(((uint64_t*)sec->segname)+0)),  segname_cstr,
-        hex0_u64be(*(((uint64_t*)sec->segname)+1)),
-        hex0_u64be(sec->addr),                       sec->addr,
-        hex0_u64be(sec->size),                       sec->size,
-        hex0_u32be(sec->offset),                     sec->offset,
-        hex0_u32be(sec->align),                      pow_u32(2, sec->align),
-        hex0_u32be(sec->reloff),                     sec->reloff,
-        hex0_u32be(sec->nreloc),                     sec->nreloc,
-        hex0_u32be(sec->flags),                      sec->flags,
-        hex0_u32be(sec->reserved1),                  sec->reserved1,
-        hex0_u32be(sec->reserved2),                  sec->reserved2,
-        hex0_u32be(sec->reserved3),                  sec->reserved3);
+        to_u64be(*(((uint64_t*)sec->sectname)+0)), sectname_cstr,
+        to_u64be(*(((uint64_t*)sec->sectname)+1)),
+        to_u64be(*(((uint64_t*)sec->segname)+0)),  segname_cstr,
+        to_u64be(*(((uint64_t*)sec->segname)+1)),
+        to_u64be(sec->addr),                       sec->addr,
+        to_u64be(sec->size),                       sec->size,
+        to_u32be(sec->offset),                     sec->offset,
+        to_u32be(sec->align),                      pow_u32(2, sec->align),
+        to_u32be(sec->reloff),                     sec->reloff,
+        to_u32be(sec->nreloc),                     sec->nreloc,
+        to_u32be(sec->flags),                      sec->flags,
+        to_u32be(sec->reserved1),                  sec->reserved1,
+        to_u32be(sec->reserved2),                  sec->reserved2,
+        to_u32be(sec->reserved3),                  sec->reserved3);
     return sizeof(struct section_64);
 }
 
@@ -661,18 +790,18 @@ ssize_t parse_segment_command_64(uint8_t *buffer, size_t len)
         "%08" PRIx32 "         ;         initprot: %" PRIu32 "\n"
         "%08" PRIx32 "         ;           nsects: %" PRIu32 "\n"
         "%08" PRIx32 "         ;            flags: %" PRIu32 "\n",
-        hex0_u32be(cmd->cmd),
-        hex0_u32be(cmd->cmdsize), cmd->cmdsize,
-        hex0_u64be(*(((uint64_t *)cmd->segname) + 0)), cmd->segname,
-        hex0_u64be(*(((uint64_t *)cmd->segname) + 1)),
-        hex0_u64be(cmd->vmaddr), cmd->vmaddr,
-        hex0_u64be(cmd->vmsize), cmd->vmsize,
-        hex0_u64be(cmd->fileoff), cmd->fileoff,
-        hex0_u64be(cmd->filesize), cmd->filesize,
-        hex0_u32be(cmd->maxprot), cmd->maxprot,
-        hex0_u32be(cmd->initprot), cmd->initprot,
-        hex0_u32be(cmd->nsects), cmd->nsects,
-        hex0_u32be(cmd->flags), cmd->flags);
+        to_u32be(cmd->cmd),
+        to_u32be(cmd->cmdsize), cmd->cmdsize,
+        to_u64be(*(((uint64_t *)cmd->segname) + 0)), cmd->segname,
+        to_u64be(*(((uint64_t *)cmd->segname) + 1)),
+        to_u64be(cmd->vmaddr), cmd->vmaddr,
+        to_u64be(cmd->vmsize), cmd->vmsize,
+        to_u64be(cmd->fileoff), cmd->fileoff,
+        to_u64be(cmd->filesize), cmd->filesize,
+        to_u32be(cmd->maxprot), cmd->maxprot,
+        to_u32be(cmd->initprot), cmd->initprot,
+        to_u32be(cmd->nsects), cmd->nsects,
+        to_u32be(cmd->flags), cmd->flags);
     
     buffer = buffer + sizeof(struct segment_command_64);
     len = len - sizeof(struct segment_command_64);
@@ -702,7 +831,8 @@ ssize_t parse_linkedit_data_command(uint8_t *buffer, size_t len)
 {
     const char *cmd_name;
     struct linkedit_data_command *cmd = (struct linkedit_data_command *)buffer;
-    if (len < sizeof(struct linkedit_data_command) || cmd->cmdsize != sizeof(struct linkedit_data_command))
+    if (len < sizeof(struct linkedit_data_command)
+        || cmd->cmdsize != sizeof(struct linkedit_data_command))
         return ~1;
     cmd_name = id2lc_command_name(cmd->cmd);
     printf(
@@ -710,10 +840,10 @@ ssize_t parse_linkedit_data_command(uint8_t *buffer, size_t len)
         "%08" PRIx32 "         ;     command size: %"PRIu32"\n"
         "%08" PRIx32 "         ;      data offset: %"PRIu32"\n"
         "%08" PRIx32 "         ;        data size: %"PRIu32"\n",
-        hex0_u32be(cmd->cmd),      id2lc_command_name(cmd->cmd),
-        hex0_u32be(cmd->cmdsize),  cmd->cmdsize,
-        hex0_u32be(cmd->dataoff),  cmd->dataoff,
-        hex0_u32be(cmd->datasize), cmd->datasize);
+        to_u32be(cmd->cmd),      id2lc_command_name(cmd->cmd),
+        to_u32be(cmd->cmdsize),  cmd->cmdsize,
+        to_u32be(cmd->dataoff),  cmd->dataoff,
+        to_u32be(cmd->datasize), cmd->datasize);
     return cmd->cmdsize;
 }
 
@@ -734,12 +864,12 @@ ssize_t parse_symtab_command(uint8_t *buffer, size_t len)
         "%08"PRIx32"         ; number of symbol: %"PRIu32"\n"
         "%08"PRIx32"         ;    string offset: %"PRIu32"\n"
         "%08"PRIx32"         ;      string size: %"PRIu32"\n",
-        hex0_u32be(cmd->cmd),     id2lc_command_name(cmd->cmd),
-        hex0_u32be(cmd->cmdsize), cmd->cmdsize,
-        hex0_u32be(cmd->symoff),  cmd->symoff,
-        hex0_u32be(cmd->nsyms),   cmd->nsyms,
-        hex0_u32be(cmd->stroff),  cmd->stroff,
-        hex0_u32be(cmd->strsize), cmd->strsize);
+        to_u32be(cmd->cmd),     id2lc_command_name(cmd->cmd),
+        to_u32be(cmd->cmdsize), cmd->cmdsize,
+        to_u32be(cmd->symoff),  cmd->symoff,
+        to_u32be(cmd->nsyms),   cmd->nsyms,
+        to_u32be(cmd->stroff),  cmd->stroff,
+        to_u32be(cmd->strsize), cmd->strsize);
     return cmd->cmdsize;
 }
 
@@ -750,7 +880,8 @@ ssize_t parse_dysymtab_command(uint8_t *buffer, size_t len)
 {
     const char *cmd_name;
     struct dysymtab_command *cmd = (struct dysymtab_command *)buffer;
-    if (len < sizeof(struct dysymtab_command) || cmd->cmdsize != sizeof(struct dysymtab_command) || cmd->cmd != LC_DYSYMTAB)
+    if (len < sizeof(struct dysymtab_command)
+        || cmd->cmdsize != sizeof(struct dysymtab_command) || cmd->cmd != LC_DYSYMTAB)
         return ~1;
     cmd_name = id2lc_command_name(cmd->cmd);
     printf(
@@ -773,25 +904,25 @@ ssize_t parse_dysymtab_command(uint8_t *buffer, size_t len)
         "%08"PRIx32"         ;          nextrel: %"PRIu32"\n"
         "%08"PRIx32"         ;        locreloff: %"PRIu32"\n"
         "%08"PRIx32"         ;          nlocrel: %"PRIu32"\n",
-        hex0_u32be(cmd->cmd),         id2lc_command_name(cmd->cmd),
-        hex0_u32be(cmd->cmdsize),        cmd->cmdsize,
-        hex0_u32be(cmd->ilocalsym),      cmd->ilocalsym,
-        hex0_u32be(cmd->nlocalsym),      cmd->nlocalsym,
-        hex0_u32be(cmd->iextdefsym),     cmd->iextdefsym,
-        hex0_u32be(cmd->nextdefsym),     cmd->nextdefsym,
-        hex0_u32be(cmd->iundefsym),      cmd->iundefsym,
-        hex0_u32be(cmd->nundefsym),      cmd->nundefsym,
-        hex0_u32be(cmd->tocoff),         cmd->tocoff,
-        hex0_u32be(cmd->ntoc),           cmd->ntoc,
-        hex0_u32be(cmd->modtaboff),      cmd->modtaboff,
-        hex0_u32be(cmd->nmodtab),        cmd->nmodtab,
-        hex0_u32be(cmd->extrefsymoff),   cmd->extrefsymoff,
-        hex0_u32be(cmd->indirectsymoff), cmd->indirectsymoff,
-        hex0_u32be(cmd->nindirectsyms),  cmd->nindirectsyms,
-        hex0_u32be(cmd->extreloff),      cmd->extreloff,
-        hex0_u32be(cmd->nextrel),        cmd->nextrel,
-        hex0_u32be(cmd->locreloff),      cmd->locreloff,
-        hex0_u32be(cmd->nlocrel),        cmd->nlocrel);
+        to_u32be(cmd->cmd),            id2lc_command_name(cmd->cmd),
+        to_u32be(cmd->cmdsize),        cmd->cmdsize,
+        to_u32be(cmd->ilocalsym),      cmd->ilocalsym,
+        to_u32be(cmd->nlocalsym),      cmd->nlocalsym,
+        to_u32be(cmd->iextdefsym),     cmd->iextdefsym,
+        to_u32be(cmd->nextdefsym),     cmd->nextdefsym,
+        to_u32be(cmd->iundefsym),      cmd->iundefsym,
+        to_u32be(cmd->nundefsym),      cmd->nundefsym,
+        to_u32be(cmd->tocoff),         cmd->tocoff,
+        to_u32be(cmd->ntoc),           cmd->ntoc,
+        to_u32be(cmd->modtaboff),      cmd->modtaboff,
+        to_u32be(cmd->nmodtab),        cmd->nmodtab,
+        to_u32be(cmd->extrefsymoff),   cmd->extrefsymoff,
+        to_u32be(cmd->indirectsymoff), cmd->indirectsymoff,
+        to_u32be(cmd->nindirectsyms),  cmd->nindirectsyms,
+        to_u32be(cmd->extreloff),      cmd->extreloff,
+        to_u32be(cmd->nextrel),        cmd->nextrel,
+        to_u32be(cmd->locreloff),      cmd->locreloff,
+        to_u32be(cmd->nlocrel),        cmd->nlocrel);
     return cmd->cmdsize;
 }
 
@@ -829,40 +960,33 @@ ssize_t parse_load_command(uint8_t *buffer, size_t len)
             printf(
                 "%08" PRIx32 "         ;          command: %.32s\n"
                 "%08" PRIx32 "         ;     command size: %"PRIu32"\n",
-                hex0_u32be(cmd->cmd),      id2lc_command_name(cmd->cmd),
-                hex0_u32be(cmd->cmdsize),  cmd->cmdsize);
+                to_u32be(cmd->cmd),      id2lc_command_name(cmd->cmd),
+                to_u32be(cmd->cmdsize),  cmd->cmdsize);
             if (cmdlen < sizeof(struct load_command) || cmdlen > len) return ~1;
             buffer = buffer + sizeof(struct load_command);
             len = len - sizeof(struct load_command);
             cmdlen = cmdlen - sizeof(struct load_command);
-            while (cmdlen > 0)
-            {
+            while (cmdlen > 0) {
                 if (cmdlen >= 8) {
-                    printf("%016" PRIx64 " ;\n", hex0_u64be(*((uint64_t*)buffer)));
+                    printf("%016" PRIx64 " ;\n", to_u64be(*((uint64_t*)buffer)));
                     buffer = buffer + 8;
                     len = len - 8;
                     cmdlen = cmdlen - 8;
-                    continue;
-                }
-                if (cmdlen >= 4) {
-                    printf("%08"PRIx32"         ;\n", hex0_u32be(*((uint32_t*)buffer)));
+                } else if (cmdlen >= 4) {
+                    printf("%08"PRIx32"         ;\n", to_u32be(*((uint32_t*)buffer)));
                     buffer = buffer + 4;
                     len = len - 4;
                     cmdlen = cmdlen - 4;
-                    continue;
-                }
-                if (cmdlen >= 2) {
-                    printf("%04"PRIx16"                 ;\n", hex0_u16be(*((uint8_t*)buffer)));
+                } else if (cmdlen >= 2) {
+                    printf("%04"PRIx16"                 ;\n", to_u16be(*((uint8_t*)buffer)));
                     buffer = buffer + 2;
                     len = len - 2;
                     cmdlen = cmdlen - 2;
-                }
-                if (cmdlen == 1) {
+                } else if (cmdlen == 1) {
                     printf("%02"PRIx8"                   ;\n", *buffer);
                     buffer = buffer + 1;
                     len = len - 1;
                     cmdlen = cmdlen - 1;
-                    break;
                 }
             }
             return (ssize_t)cmd->cmdsize;
@@ -871,24 +995,24 @@ ssize_t parse_load_command(uint8_t *buffer, size_t len)
 }
 
 /*
- * Mach-o parser entrypoint.
+ * Mach-o Parser Entrypoint.
  *
  * - buffer: raw mach-o file bytes
- * - len: mach-o file length in bytes
+ * - len: file length in bytes
  */
 int parse(uint8_t *buffer, size_t len)
 {
     uint32_t cmd_count, cmd_size;
     ssize_t ret;
-    struct mach_header_64* header = NULL;
+    struct mach_header* header = NULL;
 
-    // Parse Mach-o Header
+    // Parse Mach-O Header
     ret = parse_mach_header(buffer, len, &header);
     if (ret <= 0 || header == NULL || ((size_t)ret) > len) return ((int)~ret) | ((int)(ret == 0));
     len = len - ret;
     buffer = buffer + ret;
 
-    // Parse Mach-o Commands
+    // Parse Load Commands
     cmd_count = cmd_size = 0;
     while (cmd_count < header->ncmds)
     {
@@ -897,23 +1021,16 @@ int parse(uint8_t *buffer, size_t len)
         ret = parse_load_command(buffer, len);
 
         // Failed to parse load command
-        if (ret <= 0) {
-            fprintf(
-            stderr,
-            "[ERROR] failed to parse command %"PRIu32"\n", cmd_count);
-            return ~1;
-        }
+        if (ret <= 0)
+            fail(1, "[ERROR] failed to parse command %"PRIu32"\n", cmd_count);
 
         // Command size must be within header limits.
-        if (ret > (header->sizeofcmds - cmd_size)) {
-            fprintf(
-                stderr,
+        if (ret > (header->sizeofcmds - cmd_size))
+            fail(1,
                 "[ERROR] command %"PRIu32"/%"PRIu32" size out of bounds.\n"
                 "        command size: %"PRId64"\n"
                 "        maximum size: %"PRIu32"\n",
                 cmd_count, header->ncmds, (int64_t)ret, (header->sizeofcmds - cmd_size));
-            return ~1;
-        }
 
         len = len - ret;
         buffer = buffer + ret;
@@ -921,14 +1038,14 @@ int parse(uint8_t *buffer, size_t len)
     }
 
     // Handles the case where the total command size is less than expected
-    if (cmd_size != header->sizeofcmds) {
-        fprintf(
-            stderr,
+    if (cmd_size != header->sizeofcmds)
+        fail(1,
             "[ERROR] total commands size mismatch"
             "        (1) mach-o commands size is: %"PRIu32"\n"
-            "        (2) found %"PRIu32" commands with total size of %"PRIu32"\n", header->sizeofcmds, cmd_count, cmd_size);
-        return ~1;
-    }
+            "        (2) found %"PRIu32" commands with total size of %"PRIu32"\n",
+            header->sizeofcmds,
+            cmd_count,
+            cmd_size);
 
     return ret;
 }
@@ -946,33 +1063,19 @@ int main(int argc, char *argv[]) {
     if (argc && argv && argv[0])
         cmd = argv[0];
 
-    if (argc < 2 || !argv || !argv[1]) {
-        /* TODO: Replace this by the USAGE message */
-        fprintf(stderr, "[ERROR] %s: missing operand\n", cmd);
-        return 1;
-    }
-    if (argc > 3) {
-        fprintf(stderr, "[ERROR] %s: extra operand '%s'\n", cmd, argv[2]);
-        return 1;
-    }
-    if (stat(argv[1], &st) != 0) {
-        fprintf(stderr, "[ERROR] %s: file not found '%s'\n", cmd, argv[1]);
-        return 1;
-    }
-    if (!S_ISREG(st.st_mode)) {
-        fprintf(stderr, "[ERROR] %s: not a file '%s'\n", cmd, argv[1]);
-        return 1;
-    }
+    /* TODO: Replace this by the USAGE message */
+    if (argc < 2 || !argv || !argv[1])
+        fail(1, "[ERROR] %s: missing operand\n", cmd);
+    if (argc > 3)
+        fail(1, "[ERROR] %s: extra operand '%s'\n", cmd, argv[2]);
+    if (stat(argv[1], &st) != 0)
+        fail(1, "[ERROR] %s: file not found '%s'\n", cmd, argv[1]);
+    if (!S_ISREG(st.st_mode))
+        fail(1, "[ERROR] %s: not a file '%s'\n", cmd, argv[1]);
     if (st.st_size < sizeof(buffer))
-    {
-        fprintf(stderr, "[ERROR] %s: less than 4096 bytes in size '%s'\n", cmd, argv[1]);
-        return 1;
-    }
+        fail(1, "[ERROR] %s: less than 4096 bytes in size '%s'\n", cmd, argv[1]);
     if ((file = fopen(argv[1], "rb")) == NULL)
-    {
-        fprintf(stderr, "[ERROR] %s: cannot open file '%s'\n", cmd, argv[1]);
-        return 1;
-    }
+        fail(1, "[ERROR] %s: cannot open file '%s'\n", cmd, argv[1]);
 
     /* print the filename and size in bytes */
     printf(
@@ -981,17 +1084,12 @@ int main(int argc, char *argv[]) {
         "\n",
         argv[1], (uint64_t)st.st_size);
 
-    /* read the first 4096 bytes from file (which is mach-o minimum size) */
+    /* read the first 4096 bytes from file (Mach-o minimum size) */
     len = fread(buffer, 1, sizeof(buffer) - 1, file);
-    if (fclose(file) != 0) {
-        fprintf(stderr, "[ERROR] %s: cannot close file '%s'\n", cmd, argv[1]);
-        return 1;
-    }
-    if (len == 0 || len >= sizeof(buffer)) {
-        snprintf((char*)buffer, sizeof(buffer) - 1, "[ERROR] %s: failed to read file '%s'\n", cmd, argv[1]);
-        fail(1, (const char*)buffer);
-        return 1;
-    }
+    if (fclose(file) != 0)
+        fail(2, "[ERROR] %s: cannot close file '%s'\n", cmd, argv[1]);
+    if (len == 0 || len >= sizeof(buffer))
+        fail(2, "[ERROR] %s: failed to read file '%s'\n", cmd, argv[1]);
 
     /* Make sure the buffer ends with zero */
     buffer[len] = 0;
@@ -1000,5 +1098,5 @@ int main(int argc, char *argv[]) {
     fflush(stdin);
 
     /* start parser */
-    return parse(buffer, len);;
+    return parse(buffer, len);
 }

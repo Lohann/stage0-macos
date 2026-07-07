@@ -1,10 +1,12 @@
 /*
  * Copyright (C) 2026 Lohann Paterno Coutinho Ferreira (developer@lohann.dev)
  * 
- * mach2hex0 parses an mach-o executable and prints its header in hex0 format.
+ * Mach2Hex0 is a helper programn for converting an mach-o executable to Hex0 file.
+ * This tool is system agnostic, must work in any system with a minimal C Compiler and libc.
  * 
  * Mach-O Reference:
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/EXTERNAL_HEADERS/mach-o/loader.h#L50-L81
+ * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/machine.h#L127-L482
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/mach_loader.c#L1225-L1996
  *
  * Hex0 Format:
