@@ -24,6 +24,10 @@
 #include <stdarg.h>
 #include "mach2hex0.h"
 
+/******************************/
+/* Detect C Compiler Features */
+/******************************/
+
 /* Detect C Compiler '__has_builtin' support */
 #if defined(__has_builtin)
 #define CC_has_builtin(builtin) __has_builtin(__builtin_##builtin)
@@ -101,6 +105,9 @@ static inline uint64_t CC_bswap64(uint64_t val) {
 #define to_u64le(val) CC_bswap64(val)
 #endif
 
+/************************/
+/* structs and typedefs */
+/************************/
 /* Store the string name of a raw Mach-O Constant */
 typedef struct const_info_t {
     uint32_t value;
@@ -108,10 +115,11 @@ typedef struct const_info_t {
     const char *desc;
 } const_info_t;
 
-/*
- * String representation and description of Mach-O constants.
- */
-#define entry(n,d) ((const_info_t){ .value = to_u32le((uint32_t)(n)), .name = #n, .desc = d })
+/**********************/
+/** Mach-O Constants **/
+/**********************/
+/* Helper macro for build `const_info_t`. */
+#define entry(n,d) ((const_info_t){ .value = to_u32le(n), .name = #n, .desc = d })
 
 /* Mach-O MAGIC (first 4 bytes of any mach-o file) */
 static const_info_t mach_magics_s[4] = {
@@ -121,7 +129,7 @@ static const_info_t mach_magics_s[4] = {
     entry(MH_CIGAM_64,                 "The mach magic number (64-bit big-endian)")
 };
 
-/* CPU TYPES ( mach_header->cputype ) */
+/* CPU TYPES `mach_header->cputype` */
 static const_info_t cputypes_s[16] = {
     entry(CPU_TYPE_ANY,       NULL), /* 0xFFFFFFFF */
     entry(CPU_TYPE_VAX,       NULL), /* 0x00000001 */
@@ -141,7 +149,7 @@ static const_info_t cputypes_s[16] = {
     entry(CPU_TYPE_POWERPC64, NULL)  /* 0x01000012 */
 };
 
-/* VAX CPU SUBTYPES ( mach_header->cpusubtype ) */
+/* VAX CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_vax_s[13] = {
     entry(CPU_SUBTYPE_VAX_ALL, NULL), /* 0x00 */
     entry(CPU_SUBTYPE_VAX780,  NULL), /* 0x01 */
@@ -157,14 +165,14 @@ static const_info_t cpusubtypes_vax_s[13] = {
     entry(CPU_SUBTYPE_VAX8800, NULL), /* 0x0B */
     entry(CPU_SUBTYPE_UVAXIII, NULL), /* 0x0C */
 };
-/* MC680x0 CPU SUBTYPES */
+/* MC680x0 CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_mc680x0_s[4] = {
     entry(CPU_SUBTYPE_MC68030,      NULL),     /* 0x01 */
     entry(CPU_SUBTYPE_MC68040,      "compat"), /* 0x02 */
     entry(CPU_SUBTYPE_MC68030_ONLY, NULL),     /* 0x03 */
     entry(CPU_SUBTYPE_MC680x0_ALL,  NULL)      /* 0x01 */
 };
-/* I386 (x86) CPU SUBTYPES */
+/* I386 (x86) CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_x86_s[22] = {
     entry(CPU_SUBTYPE_XEON_MP,         NULL),
     entry(CPU_SUBTYPE_XEON,            NULL),
@@ -189,13 +197,13 @@ static const_info_t cpusubtypes_x86_s[22] = {
     entry(CPU_SUBTYPE_I386_ALL,        NULL),
     entry(CPU_SUBTYPE_INTEL_MODEL_ALL, NULL)
 };
-/* X86_64 CPU SUBTYPES */
+/* X86_64 CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_x86_64_s[3] = {
     entry(CPU_SUBTYPE_X86_64_H,   "Haswell feature subset"),
     entry(CPU_SUBTYPE_X86_ARCH1,  NULL),
     entry(CPU_SUBTYPE_X86_64_ALL, NULL)
 };
-/* ARM CPU SUBTYPES */
+/* ARM CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_arm32_s[17] = {
     entry(CPU_SUBTYPE_ARM_V8_1M_MAIN, NULL),
     entry(CPU_SUBTYPE_ARM_V8M_BASE,   NULL),
@@ -215,29 +223,29 @@ static const_info_t cpusubtypes_arm32_s[17] = {
     entry(CPU_SUBTYPE_ARM_V4T,        NULL),
     entry(CPU_SUBTYPE_ARM_ALL,        NULL)
 };
-/* ARM64 CPU SUBTYPES */
+/* ARM64 CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_arm64_s[3] = {
     entry(CPU_SUBTYPE_ARM64E,    NULL),
     entry(CPU_SUBTYPE_ARM64_V8,  NULL),
     entry(CPU_SUBTYPE_ARM64_ALL, NULL)
 };
-/* ARM64_32 CPU SUBTYPES */
+/* ARM64_32 CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_arm64_32_s[2] = {
     entry(CPU_SUBTYPE_ARM64_32_V8,  NULL),
     entry(CPU_SUBTYPE_ARM64_32_ALL, NULL)
 };
-/* MC98000 (PowerPC) CPU SUBTYPES */
+/* MC98000 (PowerPC) CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_mc98000_s[2] = {
     entry(CPU_SUBTYPE_MC98601,   NULL),
     entry(CPU_SUBTYPE_MC98000_ALL,  NULL)
 };
-/* MC88000 CPU SUBTYPES */
+/* MC88000 CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_mc88000_s[3] = {
     entry(CPU_SUBTYPE_MC88110,      NULL),
     entry(CPU_SUBTYPE_MC88100,      NULL),
     entry(CPU_SUBTYPE_MC88000_ALL,  NULL)
 };
-/* Mips CPU SUBTYPES */
+/* Mips CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_mips_s[8] = {
     entry(CPU_SUBTYPE_MIPS_R3000,  NULL),
     entry(CPU_SUBTYPE_MIPS_R3000a, "3max"),
@@ -248,22 +256,22 @@ static const_info_t cpusubtypes_mips_s[8] = {
     entry(CPU_SUBTYPE_MIPS_R2300,  NULL),
     entry(CPU_SUBTYPE_MIPS_ALL,    NULL)
 };
-/* HPPA CPU subtypes */
+/* HPPA CPU subtypes `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_hppa_s[3] = {
     entry(CPU_SUBTYPE_HPPA_7100LC,  NULL),
     entry(CPU_SUBTYPE_HPPA_7100,    "compat"),
     entry(CPU_SUBTYPE_HPPA_ALL,     NULL)
 };
-/* SPARC CPU SUBTYPES */
+/* SPARC CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_sparc_s[1] = {
     entry(CPU_SUBTYPE_SPARC_ALL,     NULL)
 };
-/* I860 CPU SUBTYPES */
+/* I860 CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_i860_s[2] = {
     entry(CPU_SUBTYPE_I860_860, NULL),
     entry(CPU_SUBTYPE_I860_ALL, NULL)
 };
-/* PowerPC CPU SUBTYPES */
+/* PowerPC CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_powerpc_s[13] = {
     entry(CPU_SUBTYPE_POWERPC_970,   NULL),
     entry(CPU_SUBTYPE_POWERPC_7450,  NULL),
@@ -280,7 +288,7 @@ static const_info_t cpusubtypes_powerpc_s[13] = {
     entry(CPU_SUBTYPE_POWERPC_ALL,   NULL)
 };
 
-/* Mach-O FILE TYPE */
+/* Mach-O FILE TYPE `mach_header->type` */
 static const_info_t filetypes_s[11] = {
     entry(MH_OBJECT,      "relocatable object file"),
     entry(MH_EXECUTE,     "demand paged executable file"),
@@ -295,7 +303,7 @@ static const_info_t filetypes_s[11] = {
     entry(MH_KEXT_BUNDLE, "x86_64 kexts")
 };
 
-/* Mach-o FILE FLAGS */
+/* Mach-o FILE FLAGS `mach_header->flags` */
 static const_info_t headerflags_s[29] = {
     entry(MH_NOUNDEFS,                      "the object file has no undefined references"),
     entry(MH_INCRLINK,                      "the object file is the output of an incremental link "
@@ -369,7 +377,7 @@ static const_info_t headerflags_s[29] = {
                                             "loose in the filesystem.")
 };
 
-/* Mach-O LOAD COMMANDS (after Mach-O header) */
+/* Mach-O LOAD COMMANDS */
 static const_info_t load_commands_s[54] = {
     /* Constants for the cmd field of all load commands, the type */
     entry(LC_SEGMENT,                  "segment of this file to be mapped"),
@@ -429,8 +437,12 @@ static const_info_t load_commands_s[54] = {
     entry(LC_DYLD_CHAINED_FIXUPS,      "used with linkedit_data_command"),
     entry(LC_FILESET_ENTRY,            "used with fileset_entry_command")
 };
-#undef entry // we no longer need this macro.
+// all `const_info_t` were defined, no longer need this macro
+#undef entry
 
+/**********************/
+/** Helper Functions **/
+/**********************/
 /* Display error message then exit and exit */
 CC_noreturn void fail(int code, const char *err, ...);
 void fail(int code, const char *err, ...)
@@ -532,17 +544,7 @@ char* sanitize_string(const char *ptr, const size_t len, char *out)
     return out;
 }
 
-/* Retrieves the Load Command Name if the ID is known, otherwise "<UNKNOWN>" */
-static const char* id2lc_command_name(uint32_t id)
-{
-    int i = 0;
-    for (i = 0; i < (sizeof(load_commands_s) / sizeof(load_commands_s[0])); i++)
-        if (load_commands_s[i].value == id)
-            return load_commands_s[i].name;
-    return "<UNKNOWN>";
-}
-
-/* Retrieves the CPU TYPE string name, otherwise NULL */
+/* Retrieves the constant name, if not found returns NULL */
 static const char* get_entry_name(const_info_t *array, size_t len, uint32_t id)
 {
     size_t i;
@@ -552,13 +554,27 @@ static const char* get_entry_name(const_info_t *array, size_t len, uint32_t id)
     return NULL;
 }
 
-/* Retrieves the CPU TYPE string name, otherwise NULL */
+/* Retrieves the constant name, if not found returns "<UNKNOWN>" */
 inline static const char* get_entry_name_or_default(const_info_t *array, size_t len, uint32_t id)
 {
     const char *name;
     if ((name = get_entry_name(array, len, id))) return name;
     else return "<UNKNOWN>";
 }
+
+/* Retrieves the Load Command Name, if not found returns "<UNKNOWN>" */
+static const char* id2lc_command_name(uint32_t id)
+{
+    return get_entry_name_or_default(
+        load_commands_s,
+        (sizeof(load_commands_s) / sizeof(load_commands_s[0])),
+        id
+    );
+}
+
+/*****************************/
+/** Mach-O Parser Functions **/
+/*****************************/
 
 /* Parses the Mach-o Header
  * TODO: add support to 32-bit headers */
