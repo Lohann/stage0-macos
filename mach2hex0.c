@@ -443,7 +443,7 @@ static const_info_t load_commands_s[54] = {
 /**********************/
 /** Helper Functions **/
 /**********************/
-/* Display error message then exit and exit */
+/* Display error message then exit */
 CC_noreturn void fail(int code, const char *err, ...);
 void fail(int code, const char *err, ...)
 {
@@ -490,10 +490,10 @@ char* sanitize_string(const char *ptr, const size_t len, char *out)
     }
     end = ptr + len;
 
-    /* move the end pointer right after the last non-zero byte */
+    /* move the end pointer to the first zero after the last non-zero byte */
     while (end > ptr && (*(end-1) == 0)) end = end - 1;
 
-    /* move the end pointer right after the last non-zero byte */
+    /* loop over each input char. */
     while (ptr < end)
     {
         ch = *ptr;
@@ -591,7 +591,7 @@ ssize_t parse_mach_header(const uint8_t *buffer, size_t len, struct mach_header*
     if (!buffer || !out || len < sizeof(struct mach_header_64))
         return ~1;
 
-    // MAGIC
+    // -- MAGIC --
     header = (struct mach_header_64*) buffer;
     switch (header->magic)
     {
@@ -612,14 +612,14 @@ ssize_t parse_mach_header(const uint8_t *buffer, size_t len, struct mach_header*
         header->magic
     );
     
-    // CPU TYPE
+    // -- CPU TYPE --
     cputype = get_entry_name_or_default(
         cputypes_s,
         (sizeof(cputypes_s) / sizeof(cputypes_s[0])),
         header->cputype
     );
     
-    // CPU SUBTYPES
+    // -- CPU SUBTYPE --
     switch (header->cputype)
     {
         case CPU_TYPE_VAX:
@@ -684,7 +684,7 @@ ssize_t parse_mach_header(const uint8_t *buffer, size_t len, struct mach_header*
     else
         cpusubtype = "<UNKNOWN>";
 
-    // FILE TYPE
+    // -- TYPE --
     filetype = get_entry_name_or_default(filetypes_s, (sizeof(filetypes_s) / sizeof(filetypes_s[0])), header->filetype);
 
     // -- FLAGS --
@@ -733,7 +733,8 @@ ssize_t parse_mach_header(const uint8_t *buffer, size_t len, struct mach_header*
         to_u32be(header->ncmds),      header->ncmds,
         to_u32be(header->sizeofcmds), header->sizeofcmds,
         to_u32be(header->flags),      headerflags);
-    
+
+    // -- RESERVED -- (only 64bit binaries)
     if (len == sizeof(struct mach_header_64))
         printf("%08"PRIx32"         ;         reserved: %"PRIu32"\n",
             to_u32be(header->reserved), header->reserved);
@@ -943,6 +944,55 @@ ssize_t parse_dysymtab_command(uint8_t *buffer, size_t len)
 }
 
 /*
+ * Generic Load Command Parser, prints the Load Command's name, size and raw bytes.
+ */
+ssize_t parse_generic_load_command(uint8_t *buffer, size_t len)
+{
+    uint32_t datasize;
+    struct load_command *cmd;
+    cmd = (struct load_command *)buffer;
+    // cmdsize must be valid
+    if (len < sizeof(struct load_command)
+        || cmd->cmdsize > len
+        || cmd->cmdsize < sizeof(struct load_command)) return ~1;
+    printf(
+        "%08" PRIx32 "         ;          command: %.32s\n"
+        "%08" PRIx32 "         ;     command size: %"PRIu32"\n",
+        to_u32be(cmd->cmd),      id2lc_command_name(cmd->cmd),
+        to_u32be(cmd->cmdsize),  cmd->cmdsize);
+
+    // Print load command data
+    // bytes are packed in groups of multiple of 2.
+    buffer = buffer + sizeof(struct load_command);
+    len = len - sizeof(struct load_command);
+    datasize = cmd->cmdsize - sizeof(struct load_command);
+    while (datasize > 0) {
+        if (datasize >= 8) {
+            printf("%016" PRIx64 " ;\n", to_u64be(*((uint64_t*)buffer)));
+            buffer = buffer + 8;
+            len = len - 8;
+            datasize = datasize - 8;
+        } else if (datasize >= 4) {
+            printf("%08"PRIx32"         ;\n", to_u32be(*((uint32_t*)buffer)));
+            buffer = buffer + 4;
+            len = len - 4;
+            datasize = datasize - 4;
+        } else if (datasize >= 2) {
+            printf("%04"PRIx16"                 ;\n", to_u16be(*((uint8_t*)buffer)));
+            buffer = buffer + 2;
+            len = len - 2;
+            datasize = datasize - 2;
+        } else if (datasize == 1) {
+            printf("%02"PRIx8"                   ;\n", *buffer);
+            buffer = buffer + 1;
+            len = len - 1;
+            datasize = datasize - 1;
+        }
+    }
+    return cmd->cmdsize;
+}
+
+/*
  * Parse and print any LC_* command, including unknown commands.
  * TODO: format LC_UNIXTHREAD-like commands for aarch64 and x86_64.
  */
@@ -971,42 +1021,8 @@ ssize_t parse_load_command(uint8_t *buffer, size_t len)
         case LC_DYSYMTAB:
             return parse_dysymtab_command(buffer, len);
         default:
-        {
-            cmdlen = cmd->cmdsize;
-            printf(
-                "%08" PRIx32 "         ;          command: %.32s\n"
-                "%08" PRIx32 "         ;     command size: %"PRIu32"\n",
-                to_u32be(cmd->cmd),      id2lc_command_name(cmd->cmd),
-                to_u32be(cmd->cmdsize),  cmd->cmdsize);
-            if (cmdlen < sizeof(struct load_command) || cmdlen > len) return ~1;
-            buffer = buffer + sizeof(struct load_command);
-            len = len - sizeof(struct load_command);
-            cmdlen = cmdlen - sizeof(struct load_command);
-            while (cmdlen > 0) {
-                if (cmdlen >= 8) {
-                    printf("%016" PRIx64 " ;\n", to_u64be(*((uint64_t*)buffer)));
-                    buffer = buffer + 8;
-                    len = len - 8;
-                    cmdlen = cmdlen - 8;
-                } else if (cmdlen >= 4) {
-                    printf("%08"PRIx32"         ;\n", to_u32be(*((uint32_t*)buffer)));
-                    buffer = buffer + 4;
-                    len = len - 4;
-                    cmdlen = cmdlen - 4;
-                } else if (cmdlen >= 2) {
-                    printf("%04"PRIx16"                 ;\n", to_u16be(*((uint8_t*)buffer)));
-                    buffer = buffer + 2;
-                    len = len - 2;
-                    cmdlen = cmdlen - 2;
-                } else if (cmdlen == 1) {
-                    printf("%02"PRIx8"                   ;\n", *buffer);
-                    buffer = buffer + 1;
-                    len = len - 1;
-                    cmdlen = cmdlen - 1;
-                }
-            }
-            return (ssize_t)cmd->cmdsize;
-        }
+            /* Generic Parser */
+            return parse_generic_load_command(buffer, len);
     }
 }
 
