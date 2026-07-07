@@ -69,10 +69,8 @@ comment='#;'
 skip=$IFS'!"$%&\'\''()*+,-./:<=>?@GHIJKLMNOPQRSTUVWXYZ[\\]^_`ghijklmnopqrstuvwxyz{|}~'
 
 # Ensure predictable behavior from utilities with locale-dependent output.
-LC_ALL=C
-export LC_ALL
-LANGUAGE=C
-export LANGUAGE
+LC_ALL=C; export LC_ALL
+LANGUAGE=C; export LANGUAGE
 
 # Ensure that fds 0, 1, and 2 are open.
 if (exec 3>&0) 2>/dev/null; then :; else exec 0</dev/null; fi
@@ -84,15 +82,15 @@ input_file=
 case $# in
   0) input_file=-  ;;
   1) input_file=$1 ;;
-  2) printf %s\\n "[ERROR] extra operand '$2'" >&2; exit 3 ;;
+  *) printf %s\\n "[ERROR] $0: extra operand '$2'" >&2; exit 3 ;;
 esac
 
 test "x$input_file" = x- || {
-  test -e "$input_file" || { printf %s\\n "[ERROR] not found '$input_file'" >&2; exit 3; }
-  test -f "$input_file" || { printf %s\\n "[ERROR] not a file '$input_file'" >&2; exit 3; }
-  test -r "$input_file" || { printf %s\\n "[ERROR] cannot read '$input_file'" >&2; exit 3; }
+  test -e "$input_file" || { printf %s\\n "[ERROR] $0: not found '$input_file'" >&2; exit 3; }
+  test -f "$input_file" || { printf %s\\n "[ERROR] $0: not a file '$input_file'" >&2; exit 3; }
+  test -r "$input_file" || { printf %s\\n "[ERROR] $0: cannot read '$input_file'" >&2; exit 3; }
   # redirect file to stdin
-  exec < "$input_file"  || { printf %s\\n "[ERROR] $?: failed to redirect '$input_file'
+  exec < "$input_file"  || { printf %s\\n "[ERROR] $0:$? failed to redirect '$input_file'
 try: cat $input_file | $0 > $input_file.out" >&2; exit 3; }
 }
 

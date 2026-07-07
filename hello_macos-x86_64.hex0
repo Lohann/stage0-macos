@@ -81,16 +81,16 @@ BD00000000       # mov     ebp, 0x0         ; terminate frame pointer chain
 6A00             # push    0x0              ; simulate a call with a return address of zero
 
 # exec: printf("hello world\n")
-BF01000000       # mov     edi, 0x1         ; ARG1 = STDOUT
-48BEA501000001   # movabs  rsi, 0x1000001a5 ; ARG2 = :hello_str (string memory address)
+BF01000000       # mov     edi, 0x1         ; ARG1    = STDOUT
+48BEA501000001   # movabs  rsi, 0x1000001a5 ; ARG2    = :hello_str (string memory address)
 000000           #
-BA0C000000       # mov     edx, 0xc         ; ARG3 = 12         (string length)
-B804000002       # mov     eax, 0x2000004   ; SYSCALL      = SYS_write
+BA0C000000       # mov     edx, 0xc         ; ARG3    = 12         (string length)
+B804000002       # mov     eax, 0x2000004   ; SYSCALL = SYS_write
 0F05             # syscall
 
 # exec: exit(0)
-BF00000000       # mov     edi, 0x0         ; ARG1 = 0 (status code)
-B801000002       # mov     eax, 0x2000001   ; SYSCALL      = SYS_exit
+BF00000000       # mov     edi, 0x0         ; ARG1    = 0 (status code)
+B801000002       # mov     eax, 0x2000001   ; SYSCALL = SYS_exit
 0F05             # syscall
 
 # (pad to 16 bytes)
@@ -99,7 +99,7 @@ B801000002       # mov     eax, 0x2000001   ; SYSCALL      = SYS_exit
 # hello_str: (address 0x1000001a5)
 68656C6C6F20776F726C640A000000 # "hello world\n\0\0\0"
 
-# # Fill the rest of the file with zeros (Mach-O files must be at least 4096 bytes)
+# Fill the rest of the file with zeros (Mach-O files must be at least 4096 bytes)
 0000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000

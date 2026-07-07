@@ -23,5 +23,16 @@ chmod +x hello_world
 # Works in Apple Silicon with Rosetta or any Intel Mac.
 ./hello_world
 ```
-
 TODO: Will push a Aarch64 hex0 example once a figure out how to create a portable executable without depending on apples dyld.
+
+## Mach2Hex0
+Tool for convert a macos executable to Hex0, Mach-O specific headers are defined in `mach2hex0.h`.
+Dependencies: Just a C compiler with libc.
+OBS: only tested on MacOS and Debian.
+```shell
+# Compile mach2hex0
+cc -std=c99 -I. -o ./mach2hex0 ./mach2hex0.c
+
+# print print the mach-o header of mach2hex0 itself.
+./mach2hex0 '<mach-o executable path here>'
+```
