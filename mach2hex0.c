@@ -24,9 +24,6 @@
 #include <inttypes.h>
 #include "mach2hex0.h"
 
-static int_fast32_t test01_s;
-static uintmax_t test02_s;
-
 /******************************/
 /* Detect C Compiler Features */
 /******************************/
