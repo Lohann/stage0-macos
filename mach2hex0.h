@@ -8,6 +8,8 @@
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/EXTERNAL_HEADERS/mach-o/loader.h#L50-L81
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/machine.h#L127-L482
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/mach_loader.c#L1225-L1996
+ * - https://github.com/aidansteele/osx-abi-macho-file-format-reference
+ * - https://www.macsyscalls.com/en/syscall
  *
  * Hex0 Format:
  * - https://bootstrapping.miraheze.org/wiki/Hex0
@@ -15,9 +17,6 @@
  * Oficial Git Repo: https://github.com/Lohann/stage0-macos
  */
 
-/*
- * This file describes the format of mach object files.
- */
 #include <stdint.h>
 
 typedef int32_t cpu_type_t;
@@ -28,8 +27,8 @@ typedef int32_t cpu_subtype_t;
  * 32-bit architectures.
  */
 struct mach_header {
-    uint32_t magic;          /* mach magic number identifier */
-    cpu_type_t cputype;      /* cpu specifier */
+    uint32_t magic;           /* mach magic number identifier */
+    cpu_type_t cputype;       /* cpu specifier */
     cpu_subtype_t cpusubtype; /* machine specifier */
     uint32_t filetype;        /* type of file */
     uint32_t ncmds;           /* number of load commands */

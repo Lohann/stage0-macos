@@ -1,6 +1,6 @@
 # stage0-macos
 
-**WIP** boostrap binary seed for MacOS, the goal is bootstrap a compiler from scratch, without relying on tools which are not installed by default in a fresh MacOS System (not even xcode command line tools).
+**work in progress** boostrap binary seed for MacOS, the goal is bootstrap a compiler from scratch, without relying on tools which are not installed by default in a fresh MacOS System (not even xcode command line tools).
 
 ## Project Structure
 - `hex0.sh`: Hex Monitor written in shell script, hex0 file in, raw bytes out, for more details see: https://bootstrapping.miraheze.org/wiki/Stage0
