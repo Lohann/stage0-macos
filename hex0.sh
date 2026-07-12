@@ -31,8 +31,7 @@
 # Author: Lohann Paterno Coutinho Ferreira (developer@lohann.dev)
 
 #### Be more Bourne compatible ####
-# This is a modified version of m4sh from GNU autoconf v2.72
-# original code:
+# This is a modified version of m4sh from GNU autoconf v2.72:
 # https://github.com/autotools-mirror/autoconf/blob/v2.72/lib/m4sugar/m4sh.m4
 DUALCASE=1; export DUALCASE # for MKS sh
 if test ${ZSH_VERSION+y} && (emulate sh) >/dev/null 2>&1
@@ -40,25 +39,11 @@ then emulate sh; NULLCMD=:
 else case `(set -o) 2>/dev/null` in *posix*) set -o posix >/dev/null 2>&1 ;; *) : ;; esac
 fi
 
-# Exit script on error
-set -e
-
-# Consider read undefined variables an error
-set -u
-
-# Disable glob expansion, to avoid ambiguity when using IFS splitting.
-case $- in
-  *f*) : ;;
-  *) set -f || { echo "builtin 'set -f' failed with status $?" >&2; exit 1; } ;;
-esac
-
+# IFS needs to be set, to space, tab, and newline, in precisely that order.
+# Quoting is to prevent editors from complaining about space-tab.
 newline='
 '       # \n newline 
 tab='	' # \t tab
-blk=' ' # \s space
-
-# IFS needs to be set, to space, tab, and newline, in precisely that order.
-# Quoting is to prevent editors from complaining about space-tab.
 IFS=" $tab$newline"
 
 # comment chars, when encountered must by skip all chars
@@ -77,6 +62,18 @@ if (exec 3>&0) 2>/dev/null; then :; else exec 0</dev/null; fi
 if (exec 3>&1) 2>/dev/null; then :; else exec 1>/dev/null; fi
 if (exec 3>&2)            ; then :; else exec 2>/dev/null; fi
 
+# Exit script on error
+set -e
+
+# Consider read undefined variables an error
+set -u
+
+# Disable glob expansion, to avoid ambiguity when using IFS splitting.
+case $- in
+  *f*) : ;;
+  *) set -f || { echo "builtin 'set -f' failed with status $?" >&2; exit 1; } ;;
+esac
+
 # Parse user arguments, otherwise read from stdin
 input_file=
 case $# in
@@ -85,6 +82,7 @@ case $# in
   *) printf %s\\n "[ERROR] $0: extra operand '$2'" >&2; exit 3 ;;
 esac
 
+# Check if input file exists
 test "x$input_file" = x- || {
   test -e "$input_file" || { printf %s\\n "[ERROR] $0: not found '$input_file'" >&2; exit 3; }
   test -f "$input_file" || { printf %s\\n "[ERROR] $0: not a file '$input_file'" >&2; exit 3; }
