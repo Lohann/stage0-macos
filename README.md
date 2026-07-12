@@ -33,6 +33,6 @@ OBS: only tested on MacOS and Debian.
 # Compile mach2hex0
 cc -std=c99 -I. -o ./mach2hex0 ./mach2hex0.c
 
-# print print the mach-o header of mach2hex0 itself.
+# print the mach-o header of mach2hex0 itself.
 ./mach2hex0 '<mach-o executable path here>'
 ```

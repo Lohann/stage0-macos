@@ -1452,18 +1452,6 @@ struct nlist {
 /// 32-bit offsets to initializers
 #define S_INIT_FUNC_OFFSETS 0x16
 
-/// CPU type targeting 64-bit Intel-based Macs
-// #define CPU_TYPE_X86_64 0x01000007
-
-/// CPU type targeting 64-bit ARM-based Macs
-// #define CPU_TYPE_ARM64 0x0100000C
-
-/// All Intel-based Macs
-// #define CPU_SUBTYPE_X86_64_ALL 0x3
-
-/// All ARM-based Macs
-// #define CPU_SUBTYPE_ARM_ALL 0x0
-
 // The following are used to encode rebasing information
 #define REBASE_TYPE_POINTER 1
 #define REBASE_TYPE_TEXT_ABSOLUTE32 2
@@ -1755,7 +1743,7 @@ enum reloc_type_x86_64
  */
 
 #define CPU_SUBTYPE_X86_ALL             ((cpu_subtype_t)3)
-#define CPU_SUBTYPE_X86_64_ALL          ((cpu_subtype_t)3)
+#define CPU_SUBTYPE_X86_64_ALL          ((cpu_subtype_t)3 | CPU_SUBTYPE_LIB64)
 #define CPU_SUBTYPE_X86_ARCH1           ((cpu_subtype_t)4)
 #define CPU_SUBTYPE_X86_64_H            ((cpu_subtype_t)8)      /* Haswell feature subset */
 

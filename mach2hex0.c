@@ -327,6 +327,11 @@ static const_info_t cpusubtypes_x86_64_s[3] = {
     entry(CPU_SUBTYPE_X86_64_H,   "Haswell feature subset"),
     entry(CPU_SUBTYPE_X86_ARCH1,  NULL),
     entry(CPU_SUBTYPE_X86_64_ALL, NULL)
+    // ((const_info_t){
+    //     .value = to_u32le(CPU_SUBTYPE_I386_ALL | CPU_SUBTYPE_LIB64),
+    //     .name = "CPU_SUBTYPE_I386_ALL | CPU_SUBTYPE_LIB64",
+    //     .desc = NULL
+    // })
 };
 /* ARM CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_arm32_s[17] = {
@@ -1164,11 +1169,17 @@ char *header2hex0(const mach_decoded_t *p, char *out)
         );
         break;
         case CPU_TYPE_X86_64:
-        val = get_entry_name_or_default(
+        val = get_entry_name(
             cpusubtypes_x86_64_s,
             (sizeof(cpusubtypes_x86_64_s) / sizeof(cpusubtypes_x86_64_s[0])),
             p->header.cpusubtype
         );
+        if (val == NULL)
+            val = get_entry_name_or_default(
+                cpusubtypes_x86_s,
+                (sizeof(cpusubtypes_x86_s) / sizeof(cpusubtypes_x86_s[0])),
+                p->header.cpusubtype & (~CPU_SUBTYPE_LIB64)
+            );
         break;
         case CPU_TYPE_MC98000:
         val = get_entry_name_or_default(
