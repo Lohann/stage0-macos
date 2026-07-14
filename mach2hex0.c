@@ -24,163 +24,13 @@
 #include <inttypes.h>
 #include "mach2hex0.h"
 
-/******************************/
-/* Detect C Compiler Features */
-/******************************/
-
-/* Convenience macro to test the version of gcc.
- * Note: only works for GCC 2.0 and later */
-#if defined(__GNUC__) && defined(__GNUC_MINOR__)
-#   define CC_GNUC_PREREQ(maj, min) \
-        ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
-#else
-#   define CC_GNUC_PREREQ(maj, min) 0
-#endif
-
-/* Detect C Compiler '__has_builtin' support */
-#if defined(__has_builtin)
-#   define CC_has_builtin(builtin) __has_builtin(__builtin_##builtin)
-#else
-#   define CC_has_builtin(builtin) 0
-#endif
-
-/* Detect C Compiler '__has_attribute' builtin support */
-#if defined(__has_attribute)
-#   define CC_has_attribute(attribute) __has_attribute(attribute)
-#else
-#   define CC_has_attribute(attribute) 0
-#endif
-
-/* Detect C Compiler '__has_include' builtin support */
-#if defined(__has_include)
-#   define CC_include(include) __has_include(include)
-#else
-#   define CC_include(include) 0
-#endif
-
-/* Detect C Compiler 'variadic arguments' support */
-#if CC_include(<stdbool.h>) && defined(__jose__)
-#   include <stdarg.h>
-#elif CC_has_builtin(va_arg)
-    typedef __builtin_va_list va_list;
-#   define va_end(ap) __builtin_va_end(ap)
-#   define va_arg(ap, type) __builtin_va_arg(ap, type)
-#   if __STDC_VERSION__ >= 202311L
-        /* C23 uses a special builtin for var_start. */
-#       define va_start(...) __builtin_c23_va_start(__VA_ARGS__)
-#   else
-        /* Versions before C23 do require the second parameter. */
-#       define va_start(ap, param) __builtin_va_start(ap, param)
-#   endif
-#else
-#   error "C Compiler doesn't support variadic arguments"
-#endif
-
-/* Portably define 'bool' type. */
-#if __STDC_VERSION__ >= 202311L
-    /* bool, true, and false are provided by the language in C23. */
-#elif __STDC_VERSION__ >= 199901L && CC_include(<stdbool.h>)
-#   include <stdbool.h>
-#else
-    typedef char bool;
-#   define false 0
-#   define true  1
-#endif
-
-/* Detect C Compiler 'restrict' attribute support */
-#undef CC_restrict
-#undef restrict
-#undef __restrict
-#if __STDC_VERSION__ >= 199901L
-#   define CC_restrict restrict
-#elif defined(__GNUC__) || defined(__TINYC__)
-#   define CC_restrict __restrict
-#else
-#   define CC_restrict
-#endif
-
-/* Detect C Compiler 'noreturn' attribute support */
-#if __STDC_VERSION__ >= 202311L
-#   define CC_noreturn [[noreturn]]
-#elif __STDC_VERSION__ >= 201112L
-#   define CC_noreturn _Noreturn
-#elif CC_has_attribute(noreturn) || defined(__GNUC__) || defined(__TINYC__)
-#   define CC_noreturn __attribute__((noreturn))
-#elif defined(_MSC_VER)
-#   define CC_noreturn __declspec(noreturn)
-#else
-#   define CC_noreturn
-#endif
-
-/* Detect C Compiler '__may_alias__' attribute support */
-#if CC_has_attribute(__may_alias__) || CC_GNUC_PREREQ(7, 1) || defined(__clang__)
-#   define CC_may_alias __attribute__((__may_alias__))
-#else
-#   define CC_may_alias
-#endif
-
-/* Detect C Compiler 'nonnull' attribute support */
-#if defined(__clang__) || CC_GNUC_PREREQ(3, 3) /* Attribute `nonnull' was valid as of gcc 3.3. */
-#   define CC_nonnull __attribute__((nonnull))
-#elif defined(_MSC_VER) && _MSC_VER >= 1400
-#   define CC_nonnull __declspec(nonnull)
-#else
-#   define CC_nonnull
-#endif
-
-/* Detect C Compiler 'inline' attribute support
- * inline requires special treatment; it's in C99, 
- * and GCC >=2.7 supports it too, but it's not in C89. */
-#undef inline
-#if (!defined(__cplusplus) && __STDC_VERSION__ >= 199901L) \
-    || defined(__cplusplus) || defined(__clang__) \
-    || (defined(__SUNPRO_C) && defined(__C99FEATURES__))
-    /* it's a keyword */
-#else
-#   if CC_GNUC_PREREQ(2, 7)
-#       define inline __inline__   /* __inline__ prevents -pedantic warnings */
-#   else
-#       define inline /* nothing */
-#   endif
-#endif
-
-/* Detect C Compiler '__builtin_bswap16' support */
-#if CC_has_builtin(bswap16) || defined(__GNUC__)
-# define CC_bswap16(val) __builtin_bswap16((uint16_t)val)
-#else
-    static inline uint16_t CC_bswap16(uint16_t val) {
-        return (uint16_t)( (val & UINT16_C(0xFF00)) >> 8 ) |
-               (uint16_t)( (val & UINT16_C(0x00FF)) << 8 );
-    }
-#endif
-
-/* Detect C Compiler '__builtin_bswap32' support */
-#if CC_has_builtin(bswap32) || defined(__GNUC__)
-#   define CC_bswap32(val) __builtin_bswap32((uint32_t)val)
-#else
-    static inline uint32_t CC_bswap32(uint32_t val) {
-        return
-        (uint32_t)CC_bswap16((uint16_t)( (val & UINT32_C(0x0000FFFF)) >>  0 )) << 16 |
-        (uint32_t)CC_bswap16((uint16_t)( (val & UINT32_C(0xFFFF0000)) >> 16 )) >>  0;
-    }
-#endif
-
-/* Detect C Compiler '__builtin_bswap64' support */
-#if CC_has_builtin(bswap64) || defined(__GNUC__)
-#   define CC_bswap64(val) __builtin_bswap64((uint64_t)val)
-#else
-    static inline uint64_t CC_bswap64(uint64_t val) {
-        return 
-        (uint64_t)CC_bswap32((uint32_t)( (val & UINT64_C(0x00000000FFFFFFFF)) >>  0 )) << 32 |
-        (uint64_t)CC_bswap32((uint32_t)( (val & UINT64_C(0xFFFFFFFF00000000)) >> 32 )) >>  0;
-    }
-#endif
+/*****************/
+/* Helper Macros */
+/*****************/
 
 /* Helpers for conversion between little-endian <=> big-endian
  * OBS: Assumes mach-o components are encoded in little-endian */
-#if defined(_MSC_VER) \
-    || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ \
-    || (defined(__LITTLE_ENDIAN__) && __LITTLE_ENDIAN__)
+#if CC_LITTLE_ENDIAN
 #   define to_u16be(val) CC_bswap16(val)
 #   define to_u32be(val) CC_bswap32(val)
 #   define to_u64be(val) CC_bswap64(val)
@@ -212,7 +62,7 @@ static inline bool CC_add_u32(uint32_t *res, uint32_t lhs, uint32_t rhs, uint8_t
 #endif
 }
 
-/* Helper for convert macro definitions to cstring */
+/* Convert macro definitions to cstring */
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -327,11 +177,6 @@ static const_info_t cpusubtypes_x86_64_s[3] = {
     entry(CPU_SUBTYPE_X86_64_H,   "Haswell feature subset"),
     entry(CPU_SUBTYPE_X86_ARCH1,  NULL),
     entry(CPU_SUBTYPE_X86_64_ALL, NULL)
-    // ((const_info_t){
-    //     .value = to_u32le(CPU_SUBTYPE_I386_ALL | CPU_SUBTYPE_LIB64),
-    //     .name = "CPU_SUBTYPE_I386_ALL | CPU_SUBTYPE_LIB64",
-    //     .desc = NULL
-    // })
 };
 /* ARM CPU SUBTYPES `mach_header->cpusubtype` */
 static const_info_t cpusubtypes_arm32_s[17] = {
@@ -567,6 +412,33 @@ static const_info_t load_commands_s[54] = {
     entry(LC_DYLD_EXPORTS_TRIE,        "used with linkedit_data_command, payload is trie"),
     entry(LC_DYLD_CHAINED_FIXUPS,      "used with linkedit_data_command"),
     entry(LC_FILESET_ENTRY,            "used with fileset_entry_command")
+};
+
+/* x86 Thread Flavors (used in LC_MAIN and LC_UNIXTHREAD commands) */
+static const_info_t x86_thread_flavors_s[23] = {
+    entry(x86_THREAD_STATE32,      NULL),
+    entry(x86_FLOAT_STATE32,       NULL),
+    entry(x86_EXCEPTION_STATE32,   NULL),
+    entry(x86_THREAD_STATE64,      NULL),
+    entry(x86_FLOAT_STATE64,       NULL),
+    entry(x86_EXCEPTION_STATE64,   NULL),
+    entry(x86_THREAD_STATE,        NULL),
+    entry(x86_FLOAT_STATE,         NULL),
+    entry(x86_EXCEPTION_STATE,     NULL),
+    entry(x86_DEBUG_STATE32,       NULL),
+    entry(x86_DEBUG_STATE64,       NULL),
+    entry(x86_DEBUG_STATE,         NULL),
+    entry(x86_THREAD_STATE_NONE,   NULL),
+    entry(x86_AVX_STATE32,         NULL),
+    entry(x86_AVX_STATE64,         NULL),
+    entry(x86_AVX_STATE,           NULL),
+    entry(x86_AVX512_STATE32,      NULL),
+    entry(x86_AVX512_STATE64,      NULL),
+    entry(x86_AVX512_STATE,        NULL),
+    entry(x86_PAGEIN_STATE,        NULL),
+    entry(x86_THREAD_FULL_STATE64, NULL),
+    entry(x86_INSTRUCTION_STATE,   NULL),
+    entry(x86_LAST_BRANCH_STATE,   NULL)
 };
 // all `const_info_t` were defined, no longer need this macro
 #undef entry
@@ -1289,7 +1161,7 @@ char *header2hex0(const mach_decoded_t *p, char *out)
 }
 
 /* encodes load command's name and size to hex0  */
-char *command_header2hex0(char *out, const struct load_command *cmd)
+char *load_command_common2hex0(char *out, const struct load_command *cmd)
 {
     const char *cmdname = get_entry_name_or_default(
         load_commands_s,
@@ -1306,7 +1178,7 @@ char *segment_command2hex0(char *out, const struct segment_command_64 *cmd)
 {
     ssize_t cmdsize, len;
     const struct section_64 *section;
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_str2hex0(out, "segment name: ", (bytes_t)cmd->segname, 16);
     out = field_int2hex0(out, "vm address: ", (bytes_t)&cmd->vmaddr, 8);
     out = field_int2hex0(out, "vm size: ", (bytes_t)&cmd->vmsize, 8);
@@ -1353,7 +1225,7 @@ char *segment_command2hex0(char *out, const struct segment_command_64 *cmd)
  */
 char *linkedit_command2hex0(char *out, const struct linkedit_data_command *cmd)
 {
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "data offset: ", (bytes_t)&cmd->dataoff, 4);
     out = field_int2hex0(out, "data size: ", (bytes_t)&cmd->datasize, 4);
     return out;
@@ -1364,7 +1236,7 @@ char *linkedit_command2hex0(char *out, const struct linkedit_data_command *cmd)
  */
 char *symtab_command2hex0(char *out, const struct symtab_command *cmd)
 {
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "symbol table offset: ", (bytes_t)&cmd->symoff, 4);
     out = field_int2hex0(out, "symbol table entries: ", (bytes_t)&cmd->nsyms, 4);
     out = field_int2hex0(out, "string table offset: ", (bytes_t)&cmd->stroff, 4);
@@ -1377,7 +1249,7 @@ char *symtab_command2hex0(char *out, const struct symtab_command *cmd)
  */
 char *dysymtab_command2hex0(char *out, const struct dysymtab_command *cmd)
 {
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "index to localsymbol: ", (bytes_t)&cmd->ilocalsym, 4);
     out = field_int2hex0(out, "number of symbols: ", (bytes_t)&cmd->nlocalsym, 4);
     out = field_int2hex0(out, "iextdefsym: ", (bytes_t)&cmd->iextdefsym, 4);
@@ -1406,7 +1278,7 @@ char *dylib_command2hex0(char *out, const struct dylib_command *cmd)
 {
     bytes_t ptr = ((bytes_t)cmd) + sizeof(struct dylib_command);
     size_t len = cmd->cmdsize - sizeof(struct dylib_command);
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "name offset: ", (bytes_t)&cmd->dylib.name, 4);
     out = field_int2hex0(out, "timestamp: ", (bytes_t)&cmd->dylib.timestamp, 4);
     out = field_int2hex0(out, "current version: ", (bytes_t)&cmd->dylib.current_version, 4);
@@ -1418,7 +1290,7 @@ char *dylib_command2hex0(char *out, const struct dylib_command *cmd)
 /* Encode LC_MAIN command to Hex0 */
 char *entry_point_command2hex0(char *out, const struct entry_point_command *cmd)
 {
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "offset of main: ", (bytes_t)&cmd->entryoff, 8);
     out = field_int2hex0(out, "initial stack size: ", (bytes_t)&cmd->stacksize, 8);
     return out;
@@ -1432,7 +1304,7 @@ char *build_version_command2hex0(char *out, const struct build_version_command *
     uint32_t val, len;
 
     /* encode command fields */
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "platform: ", (bytes_t)&cmd->platform, 4);
     *(version2str((char*)text, cmd->minos)) = 0;
     out = field_val2hex0(out, "minos: ", (const char*)text, (bytes_t)&cmd->minos, 4);
@@ -1486,7 +1358,7 @@ char *uuid_command2hex0(char *out, const struct uuid_command *cmd)
     *ptr = 0;
 
     /* encode command fields */
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_val2hex0(out, "uuid: ", (const char*)uuid, (bytes_t)cmd->uuid, sizeof(cmd->uuid));
     return out;
 }
@@ -1508,7 +1380,7 @@ char *source_version_command2hex0(char *out, const struct source_version_command
     }
 
     /* encode command fields */
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_val2hex0(out, "version: ", (const char*)version, (bytes_t)&cmd->version, sizeof(cmd->version));
     return out;
 }
@@ -1521,15 +1393,30 @@ char *dylinker_command2hex0(char *out, const struct dylinker_command *cmd)
     ptr = ((bytes_t)cmd) + cmd->name;
     end = ((bytes_t)cmd) + cmd->cmdsize;
     /* encode command fields */
-    out = command_header2hex0(out, (const struct load_command*)cmd);
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
     out = field_int2hex0(out, "name offset: ", (bytes_t)&cmd->name, 4);
     if (ptr >= (((bytes_t)cmd) + sizeof(struct dylinker_command)) && (ptr+len) <= end)
         out = field_str2hex0(out, "name: ", ptr, len);
     return out;
 }
 
+// /* Encode LC_UNIXTHREAD commands to Hex0 */
+// char *unixthread_command2hex0(char *out, const struct mach_header *header, const struct unixthread_command *cmd)
+// {
+//     bytes_t ptr, end;
+//     size_t len = cmd->cmdsize - cmd->name;
+//     ptr = ((bytes_t)cmd) + cmd->name;
+//     end = ((bytes_t)cmd) + cmd->cmdsize;
+//     /* encode command fields */
+//     out = load_command_common2hex0(out, (const struct load_command*)cmd);
+//     out = field_int2hex0(out, "name offset: ", (bytes_t)&cmd->name, 4);
+//     if (ptr >= (((bytes_t)cmd) + sizeof(struct dylinker_command)) && (ptr+len) <= end)
+//         out = field_str2hex0(out, "name: ", ptr, len);
+//     return out;
+// }
+
 /* Encode Load Command to Hex0  */
-char *load_command2hex0(char *out, const struct load_command *cmd)
+char *load_command2hex0(char *out, const struct mach_header *header, const struct load_command *cmd)
 {
     const char *val;
     uint32_t cmdsize;
@@ -1572,7 +1459,7 @@ char *load_command2hex0(char *out, const struct load_command *cmd)
     }
 
     // -- COMMAND NAME AND SIZE --
-    out = command_header2hex0(out, cmd);
+    out = load_command_common2hex0(out, cmd);
 
     // -- REST --
     val = (const char *)(((uintptr_t)cmd) + sizeof(struct load_command));
@@ -1604,7 +1491,6 @@ int parse(uint8_t *buffer, size_t len)
 {
     uint32_t cmd_count, cmd_size;
     ssize_t ret;
-    struct mach_header* header = NULL;
     mach_decoded_t p;
     char buf[8192];
     char *out, *title_ptr;
@@ -1631,13 +1517,17 @@ int parse(uint8_t *buffer, size_t len)
         out = fmt_u(out, (uintmax_t)cmd_count);
         *out = 0;
 
-        // reset pointer and write title
+        // reset pointer position and write title
         out = (char*)buf;
         *(out++) = '\n';
         out = title2hex0(out, (const char *)title_ptr, 0);
 
         // -- COMMAND --
-        out = load_command2hex0(out, p.load_commands[(cmd_count-1)]);
+        out = load_command2hex0(
+            out,
+            (const struct mach_header*)&p.header,
+            p.load_commands[(cmd_count-1)]
+        );
         *out = 0;
         fputs(buf, stdout);
         fflush(stdout);

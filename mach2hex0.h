@@ -19,6 +19,236 @@
 
 #include <stdint.h>
 
+/******************************/
+/* Detect C Compiler Features */
+/******************************/
+
+/* Detect target endianess */
+#if defined(_MSC_VER) \
+    || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ \
+    || (defined(__LITTLE_ENDIAN__) && __LITTLE_ENDIAN__)
+#   define CC_LITTLE_ENDIAN 1
+#   define CC_BIG_ENDIAN 0
+#else
+#   define CC_LITTLE_ENDIAN 0
+#   define CC_BIG_ENDIAN 1
+#endif
+
+/* Convenience macro to test the version of gcc.
+ * Note: only works for GCC 2.0 and later */
+#if defined(__GNUC__) && defined(__GNUC_MINOR__)
+#   define CC_GNUC_PREREQ(maj, min) \
+        ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
+#else
+#   define CC_GNUC_PREREQ(maj, min) 0
+#endif
+
+/* Detect C Compiler '__has_builtin' support */
+#if defined(__has_builtin)
+#   define CC_has_builtin(builtin) __has_builtin(__builtin_##builtin)
+#else
+#   define CC_has_builtin(builtin) 0
+#endif
+
+/* Detect C Compiler '__has_attribute' builtin support */
+#if defined(__has_attribute)
+#   define CC_has_attribute(attribute) __has_attribute(attribute)
+#else
+#   define CC_has_attribute(attribute) 0
+#endif
+
+/* Detect C Compiler '__has_include' builtin support */
+#if defined(__has_include)
+#   define CC_include(include) __has_include(include)
+#else
+#   define CC_include(include) 0
+#endif
+
+/* Detect C Compiler 'aligned(alignment)' attribute support */
+#if CC_has_attribute(aligned) || defined(__TINYC__)
+#   define CC_under_align(alignment) __attribute__((aligned(alignment)))
+#elif defined(_MSC_VER)
+#   define CC_under_align(alignment) __declspec(align(alignment))
+#else
+#   define CC_under_align
+#endif
+
+/* Detect C Compiler 'alignment' attribute support */
+#if __STDC_VERSION__ >= 202311L
+#   define CC_align(alignment) alignas(alignment)
+#elif __STDC_VERSION__ >= 201112L
+#   define CC_align(alignment) _Alignas(alignment)
+#else
+#   define CC_align(alignment) CC_under_align(alignment)
+#endif
+
+/* Detect C Compiler 'variadic arguments' support */
+#if CC_include(<stdbool.h>)
+#   include <stdarg.h>
+#elif CC_has_builtin(va_arg)
+    typedef __builtin_va_list va_list;
+#   define va_end(ap) __builtin_va_end(ap)
+#   define va_arg(ap, type) __builtin_va_arg(ap, type)
+#   if __STDC_VERSION__ >= 202311L
+        /* C23 uses a special builtin for var_start. */
+#       define va_start(...) __builtin_c23_va_start(__VA_ARGS__)
+#   else
+        /* Versions before C23 do require the second parameter. */
+#       define va_start(ap, param) __builtin_va_start(ap, param)
+#   endif
+#else
+#   error "C Compiler doesn't support variadic arguments"
+#endif
+
+/* Portably define 'bool' type. */
+#if __STDC_VERSION__ >= 202311L
+    /* bool, true, and false are provided by the language in C23. */
+#elif __STDC_VERSION__ >= 199901L && CC_include(<stdbool.h>)
+#   include <stdbool.h>
+#else
+    typedef char bool;
+#   define false 0
+#   define true  1
+#endif
+
+/* Detect C Compiler 'restrict' attribute support */
+#undef CC_restrict
+#undef restrict
+#undef __restrict
+#if __STDC_VERSION__ >= 199901L
+#   define CC_restrict restrict
+#elif defined(__GNUC__) || defined(__TINYC__)
+#   define CC_restrict __restrict
+#else
+#   define CC_restrict
+#endif
+
+/* Detect C Compiler 'noreturn' attribute support */
+#if __STDC_VERSION__ >= 202311L
+#   define CC_noreturn [[noreturn]]
+#elif __STDC_VERSION__ >= 201112L
+#   define CC_noreturn _Noreturn
+#elif CC_has_attribute(noreturn) || defined(__GNUC__) || defined(__TINYC__)
+#   define CC_noreturn __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#   define CC_noreturn __declspec(noreturn)
+#else
+#   define CC_noreturn
+#endif
+
+/* Detect C Compiler '__may_alias__' attribute support */
+#if CC_has_attribute(__may_alias__) || CC_GNUC_PREREQ(7, 1) || defined(__clang__)
+#   define CC_may_alias __attribute__((__may_alias__))
+#else
+#   define CC_may_alias
+#endif
+
+/* Detect C Compiler 'nonnull' attribute support */
+#if defined(__clang__) || CC_GNUC_PREREQ(3, 3) /* Attribute `nonnull' was valid as of gcc 3.3. */
+#   define CC_nonnull __attribute__((nonnull))
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
+#   define CC_nonnull __declspec(nonnull)
+#else
+#   define CC_nonnull
+#endif
+
+/* Detect C Compiler 'inline' attribute support
+ * inline requires special treatment; it's in C99, 
+ * and GCC >=2.7 supports it too, but it's not in C89. */
+#undef inline
+#if (!defined(__cplusplus) && __STDC_VERSION__ >= 199901L) \
+    || defined(__cplusplus) || defined(__clang__) \
+    || (defined(__SUNPRO_C) && defined(__C99FEATURES__))
+    /* it's a keyword */
+#else
+#   if CC_GNUC_PREREQ(2, 7)
+#       define inline __inline__   /* __inline__ prevents -pedantic warnings */
+#   else
+#       define inline /* nothing */
+#   endif
+#endif
+
+/* Detect C Compiler '__builtin_bswap16' support */
+#if CC_has_builtin(bswap16) || defined(__GNUC__)
+# define CC_bswap16(val) __builtin_bswap16((uint16_t)val)
+#else
+    static inline uint16_t CC_bswap16(uint16_t val) {
+        return (uint16_t)( (val & UINT16_C(0xFF00)) >> 8 ) |
+               (uint16_t)( (val & UINT16_C(0x00FF)) << 8 );
+    }
+#endif
+
+/* Detect C Compiler '__builtin_bswap32' support */
+#if CC_has_builtin(bswap32) || defined(__GNUC__)
+#   define CC_bswap32(val) __builtin_bswap32((uint32_t)val)
+#else
+    static inline uint32_t CC_bswap32(uint32_t val) {
+        return
+        (uint32_t)CC_bswap16((uint16_t)( (val & UINT32_C(0x0000FFFF)) >>  0 )) << 16 |
+        (uint32_t)CC_bswap16((uint16_t)( (val & UINT32_C(0xFFFF0000)) >> 16 )) >>  0;
+    }
+#endif
+
+/* Detect C Compiler '__builtin_bswap64' support */
+#if CC_has_builtin(bswap64) || defined(__GNUC__)
+#   define CC_bswap64(val) __builtin_bswap64((uint64_t)val)
+#else
+    static inline uint64_t CC_bswap64(uint64_t val) {
+        return 
+        (uint64_t)CC_bswap32((uint32_t)( (val & UINT64_C(0x00000000FFFFFFFF)) >>  0 )) << 32 |
+        (uint64_t)CC_bswap32((uint32_t)( (val & UINT64_C(0xFFFFFFFF00000000)) >> 32 )) >>  0;
+    }
+#endif
+
+// Detect C compiler `native 128-bit integer` support
+#if defined(__SIZEOF_INT128__)
+    typedef signed   __int128 int128_t;
+    typedef unsigned __int128 uint128_t;
+    typedef signed   __int128 int_fast128_t;
+    typedef unsigned __int128 uint_fast128_t;
+    typedef signed   __int128 int_least128_t;
+    typedef unsigned __int128 uint_least128_t;
+#   define UINT128_MAX         ((uint128_t)-1)
+#   define INT128_MAX          ((int128_t)+(UINT128_MAX/2))
+#   define INT128_MIN          (-INT128_MAX-1)
+#   define UINT_LEAST128_MAX   UINT128_MAX
+#   define INT_LEAST128_MAX    INT128_MAX
+#   define INT_LEAST128_MIN    INT128_MIN
+#   define UINT_FAST128_MAX    UINT128_MAX
+#   define INT_FAST128_MAX     INT128_MAX
+#   define INT_FAST128_MIN     INT128_MIN
+#   define INT128_WIDTH        128
+#   define UINT128_WIDTH       128
+#   define INT_LEAST128_WIDTH  128
+#   define UINT_LEAST128_WIDTH 128
+#   define INT_FAST128_WIDTH   128
+#   define UINT_FAST128_WIDTH  128
+#   if UINT128_WIDTH > __LLONG_WIDTH__
+#       define INT128_C(N)         ((int_least128_t)+N ## WB)
+#       define UINT128_C(N)        ((uint_least128_t)+N ## WBU)
+#   else
+#       define INT128_C(N)         ((int_least128_t)+N ## LL)
+#       define UINT128_C(N)        ((uint_least128_t)+N ## LLU)
+#   endif
+#   define CC_make_u128(hi, lo) (((uint128_t)hi)<<64|((uint128_t)lo))
+#   define CC_make_i128(hi, lo) ((int128_t)CC_make_u128(hi, lo))
+#else
+    // Fallback emulation struct.
+#   if CC_LITTLE_ENDIAN
+        typedef struct { CC_align(16) uint64_t lo; uint64_t hi; } uint128_t;
+        typedef struct { CC_align(16) uint64_t lo;  int64_t hi; } int128_t;
+#   else
+        typedef struct { CC_align(16) uint64_t hi; uint64_t lo; } uint128_t;
+        typedef struct { CC_align(16)  int64_t hi; uint64_t lo; } int128_t;
+#   endif
+#   define CC_init_u128(hi, lo) ((uint128_t){ .h##i = ((uint64_t)hi), .l##o = ((uint64_t)lo) })
+#   define CC_init_i128(hi, lo) ((uint128_t){ .h##i = ((int64_t)hi),  .l##o = ((uint64_t)lo) })
+#endif
+
+/************************/
+/* structs and typedefs */
+/************************/
+
 typedef int32_t cpu_type_t;
 typedef int32_t cpu_subtype_t;
 
@@ -600,62 +830,6 @@ struct rpath_command {
 };
 
 typedef uint32_t vm_prot_t;
-// struct __attribute__((packed)) vm_prot_t {
-//     READ: uint32_t = false,
-//     WRITE: uint32_t = false,
-//     EXEC: uint32_t = false,
-//     _: u1 = 0,
-//     /// When a caller finds that they cannot obtain write permission on a
-//     /// mapped entry, the following flag can be used. The entry will be
-//     /// made "needs copy" effectively copying the object (using COW),
-//     /// and write permission will be added to the maximum protections for
-//     /// the associated entry.
-//     COPY: uint32_t = false,
-//     __: u27 = 0,
-// };
-
-// /// The segment load command indicates that a part of this file is to be
-// /// mapped into the task's address space.  The size of this segment in memory,
-// /// vmsize, maybe equal to or larger than the amount to map from this file,
-// /// filesize.  The file is mapped starting at fileoff to the beginning of
-// /// the segment in memory, vmaddr.  The rest of the memory of the segment,
-// /// if any, is allocated zero fill on demand.  The segment's maximum virtual
-// /// memory protection and initial virtual memory protection are specified
-// /// by the maxprot and initprot fields.  If the segment has sections then the
-// /// section structures directly follow the segment command and their size is
-// /// reflected in cmdsize.
-// #define segment_command extern struct {
-//     /// LC_SEGMENT
-//     cmd: LC .SEGMENT,
-
-//     /// includes sizeof section structs
-//     cmdsize;
-
-//     /// segment name
-//     segname: [16]u8,
-
-//     /// memory address of this segment
-//     vmaddr;
-
-//     /// memory size of this segment
-//     vmsize;
-
-//     /// file offset of this segment
-//     fileoff;
-
-//     /// amount to map from the file
-//     filesize;
-
-//     /// maximum VM protection
-//     maxprot: vm_prot_t,
-
-//     /// initial VM protection
-//     initprot: vm_prot_t,
-
-//     /// number of sections in segment
-//     nsects;
-//     flags;
-// }
 
 /// The segment load command indicates that a part of this file is to be
 /// mapped into the task's address space.  The size of this segment in memory,
@@ -667,36 +841,19 @@ typedef uint32_t vm_prot_t;
 /// by the maxprot and initprot fields.  If the segment has sections then the
 /// section structures directly follow the segment command and their size is
 /// reflected in cmdsize.
-struct segment_command { // for 32-bit architectures */
-	uint32_t cmd;		/* LC_SEGMENT */
-	uint32_t cmdsize;	/* includes sizeof section structs */
-	char segname[16];	/* segment name */
-	uint32_t vmaddr;		/* memory address of this segment */
-	uint32_t vmsize;		/* memory size of this segment */
-	uint32_t fileoff;	/* file offset of this segment */
-	uint32_t filesize;	/* amount to map from the file */
-	vm_prot_t maxprot;	/* maximum VM protection */
-	vm_prot_t initprot;	/* initial VM protection */
-	uint32_t nsects;		/* number of sections in segment */
-	uint32_t flags;		/* flags */
+struct segment_command {/* for 32-bit architectures */
+    uint32_t cmd;       /* LC_SEGMENT */
+    uint32_t cmdsize;   /* includes sizeof section structs */
+    char segname[16];   /* segment name */
+    uint32_t vmaddr;    /* memory address of this segment */
+    uint32_t vmsize;    /* memory size of this segment */
+    uint32_t fileoff;   /* file offset of this segment */
+    uint32_t filesize;  /* amount to map from the file */
+    vm_prot_t maxprot;  /* maximum VM protection */
+    vm_prot_t initprot; /* initial VM protection */
+    uint32_t nsects;    /* number of sections in segment */
+    uint32_t flags;     /* flags */
 };
-
-// #define PROT struct {
-//     /// [MC2] no permissions
-//     #define NONE: vm_prot_t 0x00
-//     /// [MC2] pages can be read
-//     #define READ: vm_prot_t 0x01
-//     /// [MC2] pages can be written
-//     #define WRITE: vm_prot_t 0x02
-//     /// [MC2] pages can be executed
-//     #define EXEC: vm_prot_t 0x04
-//     /// When a caller finds that they cannot obtain write permission on a
-//     /// mapped entry, the following flag can be used. The entry will be
-//     /// made "needs copy" effectively copying the object (using COW),
-//     /// and write permission will be added to the maximum protections for
-//     /// the associated entry.
-//     #define COPY: vm_prot_t 0x10
-// }
 
 /// A segment is made up of zero or more sections.  Non-MH_OBJECT files have
 /// all of their segments with the proper sections in each, and padded to the
@@ -792,11 +949,6 @@ struct section_64 {        /* for 64-bit architectures */
 	uint32_t reserved3;    /* reserved */
 };
 
-// fn parseName(name: *const [16]u8) []const u8 {
-//     const len mem.findScalar(u8, name, @as(u8, 0)) orelse name.len
-//     return name[0..len]
-// }
-
 struct nlist {
     uint32_t n_strx;
     uint8_t n_type;
@@ -805,105 +957,34 @@ struct nlist {
     uint32_t n_value;
 };
 
-// struct nlist_64 {
-//     uint32_t n_strx;
-//     n_type: union(u8) /* packed */ {
-//         bits: packed struct(u8) {
-//             ext: bool,
-//             type: enum(u3) {
-//                 undf 0,
-//                 abs 1,
-//                 sect 7,
-//                 pbud 6,
-//                 indr 5,
-//                 _,
-//             },
-//             pext: bool,
-//             /// Any non-zero value indicates this is an stab, so the `stab` field should be used.
-//             is_stab: u3,
-//         },
-//         stab: enum(u8) {
-//             gsym N_GSYM,
-//             fname N_FNAME,
-//             fun N_FUN,
-//             stsym N_STSYM,
-//             lcsym N_LCSYM,
-//             bnsym N_BNSYM,
-//             ast N_AST,
-//             opt N_OPT,
-//             rsym N_RSYM,
-//             sline N_SLINE,
-//             ensym N_ENSYM,
-//             ssym N_SSYM,
-//             so N_SO,
-//             oso N_OSO,
-//             lsym N_LSYM,
-//             bincl N_BINCL,
-//             sol N_SOL,
-//             params N_PARAMS,
-//             version N_VERSION,
-//             olevel N_OLEVEL,
-//             psym N_PSYM,
-//             eincl N_EINCL,
-//             entry N_ENTRY,
-//             lbrac N_LBRAC,
-//             excl N_EXCL,
-//             rbrac N_RBRAC,
-//             bcomm N_BCOMM,
-//             ecomm N_ECOMM,
-//             ecoml N_ECOML,
-//             leng N_LENG,
-//             _,
-//         },
-//     },
-//     n_sect: u8,
-//     n_desc: packed struct(u16) {
-//         _pad0: u3 0,
-//         arm_thumb_def: bool,
-//         referenced_dynamically: bool,
-//         /// The meaning of this bit is contextual.
-//         /// See `N_DESC_DISCARDED` and `N_NO_DEAD_STRIP`.
-//         discarded_or_no_dead_strip: bool,
-//         weak_ref: bool,
-//         /// The meaning of this bit is contextual.
-//         /// See `N_WEAK_DEF` and `N_REF_TO_WEAK`.
-//         weak_def_or_ref_to_weak: bool,
-//         symbol_resolver: bool,
-//         alt_entry: bool,
-//         _pad2: u6 0,
-//     },
-//     n_value: u64,
-
-//     pub fn tentative(sym: nlist_64) bool {
-//         return sym.n_type.bits.type= .undf and sym.n_value != 0
-//     }
-// };
-
-/// Format of a relocation entry of a Mach-O file.  Modified from the 4.3BSD
-/// format.  The modifications from the original format were changing the value
-/// of the r_symbolnum field for "local" (r_extern= 0) relocation entries.
-/// This modification is required to support symbols in an arbitrary number of
-/// sections not just the three sections (text, data and bss) in a 4.3BSD file.
-/// Also the last 4 bits have had the r_type tag added to them.
-// struct __attribute__((packed)) relocation_info_t {
-//     /// offset in the section to what is being relocated
-//     int32_t r_address;
-
-//     /// symbol index if r_extern= 1 or section ordinal if r_extern= 0
-//     r_symbolnum: u24,
-
-//     /// was relocated pc relative already
-//     r_pcrel: u1,
-
-//     /// 0=byte, 1=word, 2=long, 3=quad
-//     r_length: u2,
-
-//     /// does not include value of sym referenced
-//     r_extern: u1,
-
-//     /// if not 0, machine specific relocation type
-//     r_type: u4,
-// };
+/*
+ * Thread commands contain machine-specific data structures suitable for
+ * use in the thread state primitives.  The machine specific data structures
+ * follow the struct thread_command as follows.
+ * Each flavor of machine specific data structure is preceded by an uint32_t
+ * constant for the flavor of that data structure, an uint32_t that is the
+ * count of uint32_t's of the size of the state data structure and then
+ * the state data structure follows.  This triple may be repeated for many
+ * flavors.  The constants for the flavors, counts and state data structure
+ * definitions are expected to be in the header file <machine/thread_status.h>.
+ * These machine specific data structures sizes must be multiples of
+ * 4 bytes.  The cmdsize reflects the total size of the thread_command
+ * and all of the sizes of the constants for the flavors, counts and state
+ * data structures.
+ *
+ * For executable objects that are unix processes there will be one
+ * thread_command (cmd == LC_UNIXTHREAD) created for it by the link-editor.
+ * This is the same as a LC_THREAD, except that a stack is automatically
+ * created (based on the shell's limit for the stack size).  Command arguments
+ * and environment variables are copied onto that stack.
+ */
+struct unixthread_command {
+    uint32_t cmd;       /* LC_UNIXTHREAD */
+    uint32_t cmdsize;   /* total size of this command */
+    uint32_t flavor;    /* flavor of thread state */
+    uint32_t count;     /* count of uint32_t's in thread state */
+    /* struct XXX_thread_state state   thread state for this flavor */
+};
 
 /// After MacOS X 10.1 when a new load command is added that is required to be
 /// understood by the dynamic linker for the image to execute properly the
@@ -1931,3 +2012,851 @@ enum reloc_type_x86_64
 /* The following synonyms are deprecated: */
 #define CPUFAMILY_INTEL_6_23    CPUFAMILY_INTEL_PENRYN
 #define CPUFAMILY_INTEL_6_26    CPUFAMILY_INTEL_NEHALEM
+
+/*
+ * x86 Thread Flavors
+ * Reference:
+ * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/i386/thread_status.h#L93-L180
+ */
+#define i386_THREAD_STATE               1
+#define i386_FLOAT_STATE                2
+#define i386_EXCEPTION_STATE            3
+#define x86_THREAD_STATE32              1
+#define x86_FLOAT_STATE32               2
+#define x86_EXCEPTION_STATE32           3
+#define x86_THREAD_STATE64              4
+#define x86_FLOAT_STATE64               5
+#define x86_EXCEPTION_STATE64           6
+#define x86_THREAD_STATE                7
+#define x86_FLOAT_STATE                 8
+#define x86_EXCEPTION_STATE             9
+#define x86_DEBUG_STATE32               10
+#define x86_DEBUG_STATE64               11
+#define x86_DEBUG_STATE                 12
+#define x86_THREAD_STATE_NONE           13
+/* 14 and 15 are used for the internal x86_SAVED_STATE flavours */
+/* Arrange for flavors to take sequential values, 32-bit, 64-bit, non-specific */
+#define x86_AVX_STATE32                 16
+#define x86_AVX_STATE64                 (x86_AVX_STATE32 + 1)
+#define x86_AVX_STATE                   (x86_AVX_STATE32 + 2)
+#define x86_AVX512_STATE32              19
+#define x86_AVX512_STATE64              (x86_AVX512_STATE32 + 1)
+#define x86_AVX512_STATE                (x86_AVX512_STATE32 + 2)
+#define x86_PAGEIN_STATE                22
+#define x86_THREAD_FULL_STATE64         23
+#define x86_INSTRUCTION_STATE           24
+#define x86_LAST_BRANCH_STATE           25
+#define x86_THREAD_STATE_FLAVORS        26 /* This must be updated to 1 more than the highest numerical state flavor */
+
+/*
+ * Largest state on this machine:
+ * (be sure mach/machine/thread_state.h matches!)
+ */
+#define THREAD_MACHINE_STATE_MAX        THREAD_STATE_MAX
+
+#define x86_FLAVOR_MODIFIES_CORE_CPU_REGISTERS(x) \
+((x == x86_THREAD_STATE) ||     \
+ (x == x86_THREAD_STATE32) ||   \
+ (x == x86_THREAD_STATE64) ||   \
+ (x == x86_THREAD_FULL_STATE64))
+
+/*
+ * x86_VALID_THREAD_STATE_FLAVOR is a platform specific macro that when passed
+ * an exception flavor will return if that is a defined flavor for that
+ * platform. The macro must be manually updated to include all of the valid
+ * exception flavors as defined above.
+ */
+#define x86_VALID_THREAD_STATE_FLAVOR(x) \
+	 ((x == x86_THREAD_STATE32)		|| \
+	  (x == x86_FLOAT_STATE32)		|| \
+	  (x == x86_EXCEPTION_STATE32)		|| \
+	  (x == x86_DEBUG_STATE32)		|| \
+	  (x == x86_THREAD_STATE64)		|| \
+	  (x == x86_THREAD_FULL_STATE64)	|| \
+	  (x == x86_FLOAT_STATE64)		|| \
+	  (x == x86_EXCEPTION_STATE64)		|| \
+	  (x == x86_DEBUG_STATE64)		|| \
+	  (x == x86_THREAD_STATE)		|| \
+	  (x == x86_FLOAT_STATE)		|| \
+	  (x == x86_EXCEPTION_STATE)		|| \
+	  (x == x86_DEBUG_STATE)		|| \
+	  (x == x86_AVX_STATE32)		|| \
+	  (x == x86_AVX_STATE64)		|| \
+	  (x == x86_AVX_STATE)			|| \
+	  (x == x86_AVX512_STATE32)		|| \
+	  (x == x86_AVX512_STATE64)		|| \
+	  (x == x86_AVX512_STATE)		|| \
+	  (x == x86_PAGEIN_STATE)		|| \
+	  (x == x86_INSTRUCTION_STATE)		|| \
+	  (x == x86_LAST_BRANCH_STATE)		|| \
+	  (x == x86_THREAD_STATE_NONE))
+
+struct x86_state_hdr {
+	uint32_t        flavor;
+	uint32_t        count;
+};
+typedef struct x86_state_hdr x86_state_hdr_t;
+
+// Thread states, used in LC_UNIXTHREAD load command.
+// Reference:
+// https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/i386/_structs.h#L713-L765
+struct x86_mmst_reg
+{
+    uint8_t    mmst_reg[10];
+    uint8_t    mmst_rsrv[6];
+};
+
+struct x86_thread_state32 {
+    uint32_t eax;
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t edi;
+    uint32_t esi;
+    uint32_t ebp;
+    uint32_t esp;
+    uint32_t ss;
+    uint32_t eflags;
+    uint32_t eip;
+    uint32_t cs;
+    uint32_t ds;
+    uint32_t es;
+    uint32_t fs;
+    uint32_t gs;
+};
+typedef struct x86_thread_state32 x86_thread_state32_t;
+#define i386_THREAD_STATE_COUNT ((uint32_t) (sizeof (struct x86_thread_state32) / sizeof (uint32_t)))
+#define x86_THREAD_STATE32_COUNT i386_THREAD_STATE_COUNT
+
+struct x86_float_state32 {
+	uint32_t            fpu_reserved[2];
+	uint16_t            fpu_fcw;          /* x87 FPU control word */
+	uint16_t            fpu_fsw;          /* x87 FPU status word */
+	uint8_t             fpu_ftw;          /* x87 FPU tag word */
+	uint8_t             fpu_rsrv1;        /* reserved */ 
+	uint16_t            fpu_fop;          /* x87 FPU Opcode */
+	uint32_t            fpu_ip;           /* x87 FPU Instruction Pointer offset */
+	uint16_t            fpu_cs;           /* x87 FPU Instruction Pointer Selector */
+	uint16_t            fpu_rsrv2;        /* reserved */
+	uint32_t            fpu_dp;           /* x87 FPU Instruction Operand(Data) Pointer offset */
+	uint16_t            fpu_ds;           /* x87 FPU Instruction Operand(Data) Pointer Selector */
+	uint16_t            fpu_rsrv3;		  /* reserved */
+	uint32_t            fpu_mxcsr;		  /* MXCSR Register state */
+	uint32_t            fpu_mxcsrmask;    /* MXCSR mask */
+	struct x86_mmst_reg fpu_stmm0;        /* ST0/MM0    */
+	struct x86_mmst_reg fpu_stmm1;        /* ST1/MM1    */
+	struct x86_mmst_reg fpu_stmm2;        /* ST2/MM2    */
+	struct x86_mmst_reg fpu_stmm3;        /* ST3/MM3    */
+	struct x86_mmst_reg fpu_stmm4;        /* ST4/MM4    */
+	struct x86_mmst_reg fpu_stmm5;        /* ST5/MM5    */
+	struct x86_mmst_reg fpu_stmm6;        /* ST6/MM6    */
+	struct x86_mmst_reg fpu_stmm7;        /* ST7/MM7    */
+	uint8_t             fpu_xmm0[16];     /* XMM 0      */
+	uint8_t             fpu_xmm1[16];     /* XMM 1      */
+	uint8_t             fpu_xmm2[16];     /* XMM 2      */
+	uint8_t             fpu_xmm3[16];     /* XMM 3      */
+	uint8_t             fpu_xmm4[16];     /* XMM 4      */
+	uint8_t             fpu_xmm5[16];     /* XMM 5      */
+	uint8_t             fpu_xmm6[16];     /* XMM 6      */
+	uint8_t             fpu_xmm7[16];     /* XMM 7      */
+	uint8_t			    fpu_rsrv4[14*16]; /* reserved   */
+	uint32_t            fpu_reserved1;
+};
+typedef struct x86_float_state32 x86_float_state32_t;
+#define i386_FLOAT_STATE_COUNT ((uint32_t) (sizeof (struct x86_float_state32) / sizeof (uint32_t)))
+#define x86_FLOAT_STATE32_COUNT i386_FLOAT_STATE_COUNT
+
+struct x86_avx_state32
+{
+    uint32_t            fpu_reserved[2];
+    uint16_t            fpu_fcw;          /* x87 FPU control word */
+    uint16_t            fpu_fsw;          /* x87 FPU status word */
+    uint8_t             fpu_ftw;          /* x87 FPU tag word */
+    uint8_t             fpu_rsrv1;        /* reserved */ 
+    uint16_t            fpu_fop;          /* x87 FPU Opcode */
+    uint32_t            fpu_ip;           /* x87 FPU Instruction Pointer offset */
+    uint16_t            fpu_cs;           /* x87 FPU Instruction Pointer Selector */
+    uint16_t            fpu_rsrv2;        /* reserved */
+    uint32_t            fpu_dp;           /* x87 FPU Instruction Operand(Data) Pointer offset */
+    uint16_t            fpu_ds;           /* x87 FPU Instruction Operand(Data) Pointer Selector */
+    uint16_t            fpu_rsrv3;        /* reserved */
+    uint32_t            fpu_mxcsr;        /* MXCSR Register state */
+    uint32_t            fpu_mxcsrmask;    /* MXCSR mask */
+    struct x86_mmst_reg fpu_stmm0;        /* ST0/MM0   */
+    struct x86_mmst_reg fpu_stmm1;        /* ST1/MM1  */
+    struct x86_mmst_reg fpu_stmm2;        /* ST2/MM2  */
+    struct x86_mmst_reg fpu_stmm3;        /* ST3/MM3  */
+    struct x86_mmst_reg fpu_stmm4;        /* ST4/MM4  */
+    struct x86_mmst_reg fpu_stmm5;        /* ST5/MM5  */
+    struct x86_mmst_reg fpu_stmm6;        /* ST6/MM6  */
+    struct x86_mmst_reg fpu_stmm7;        /* ST7/MM7  */
+    uint8_t             fpu_xmm0[16];     /* XMM 0  */
+    uint8_t             fpu_xmm1[16];     /* XMM 1  */
+    uint8_t             fpu_xmm2[16];     /* XMM 2  */
+    uint8_t             fpu_xmm3[16];     /* XMM 3  */
+    uint8_t             fpu_xmm4[16];     /* XMM 4  */
+    uint8_t             fpu_xmm5[16];     /* XMM 5  */
+    uint8_t             fpu_xmm6[16];     /* XMM 6  */
+    uint8_t             fpu_xmm7[16];     /* XMM 7  */
+    uint8_t			    fpu_rsrv4[14*16]; /* reserved */
+    int32_t             fpu_reserved1;
+    uint8_t			    avx_reserved1[64];
+    uint8_t             fpu_ymmh0[16];    /* YMMH 0  */
+    uint8_t             fpu_ymmh1[16];    /* YMMH 1  */
+    uint8_t             fpu_ymmh2[16];    /* YMMH 2  */
+    uint8_t             fpu_ymmh3[16];    /* YMMH 3  */
+    uint8_t             fpu_ymmh4[16];    /* YMMH 4  */
+    uint8_t             fpu_ymmh5[16];    /* YMMH 5  */
+    uint8_t             fpu_ymmh6[16];    /* YMMH 6  */
+    uint8_t             fpu_ymmh7[16];    /* YMMH 7  */
+};
+typedef struct x86_avx_state32 x86_avx_state32_t;
+#define x86_AVX_STATE32_COUNT ((uint32_t) (sizeof (struct x86_avx_state32) / sizeof (uint32_t)))
+
+struct x86_avx512_state32
+{
+    uint32_t            fpu_reserved[2];
+    uint16_t            fpu_fcw;            /* x87 FPU control word */
+    uint16_t            fpu_fsw;            /* x87 FPU status word */
+    uint8_t             fpu_ftw;            /* x87 FPU tag word */
+    uint8_t             fpu_rsrv1;          /* reserved */ 
+    uint16_t            fpu_fop;            /* x87 FPU Opcode */
+    uint32_t            fpu_ip;             /* x87 FPU Instruction Pointer offset */
+    uint16_t            fpu_cs;             /* x87 FPU Instruction Pointer Selector */
+    uint16_t            fpu_rsrv2;          /* reserved */
+    uint32_t            fpu_dp;             /* x87 FPU Instruction Operand(Data) Pointer offset */
+    uint16_t            fpu_ds;             /* x87 FPU Instruction Operand(Data) Pointer Selector */
+    uint16_t            fpu_rsrv3;          /* reserved */
+    uint32_t            fpu_mxcsr;          /* MXCSR Register state */
+    uint32_t            fpu_mxcsrmask;      /* MXCSR mask */
+    struct x86_mmst_reg fpu_stmm0;          /* ST0/MM0   */
+    struct x86_mmst_reg fpu_stmm1;          /* ST1/MM1  */
+    struct x86_mmst_reg fpu_stmm2;          /* ST2/MM2  */
+    struct x86_mmst_reg fpu_stmm3;          /* ST3/MM3  */
+    struct x86_mmst_reg fpu_stmm4;          /* ST4/MM4  */
+    struct x86_mmst_reg fpu_stmm5;          /* ST5/MM5  */
+    struct x86_mmst_reg fpu_stmm6;          /* ST6/MM6  */
+    struct x86_mmst_reg fpu_stmm7;          /* ST7/MM7  */
+    uint8_t             fpu_xmm0[16];       /* XMM 0  */
+    uint8_t             fpu_xmm1[16];       /* XMM 1  */
+    uint8_t             fpu_xmm2[16];       /* XMM 2  */
+    uint8_t             fpu_xmm3[16];       /* XMM 3  */
+    uint8_t             fpu_xmm4[16];       /* XMM 4  */
+    uint8_t             fpu_xmm5[16];       /* XMM 5  */
+    uint8_t             fpu_xmm6[16];       /* XMM 6  */
+    uint8_t             fpu_xmm7[16];       /* XMM 7  */
+    int8_t              fpu_rsrv4[14*16];   /* reserved */
+    int32_t             fpu_reserved1;
+    int8_t              avx_reserved1[64];
+    uint8_t             fpu_ymmh0[16];		/* YMMH 0  */
+    uint8_t             fpu_ymmh1[16];		/* YMMH 1  */
+    uint8_t             fpu_ymmh2[16];		/* YMMH 2  */
+    uint8_t             fpu_ymmh3[16];		/* YMMH 3  */
+    uint8_t             fpu_ymmh4[16];		/* YMMH 4  */
+    uint8_t             fpu_ymmh5[16];		/* YMMH 5  */
+    uint8_t             fpu_ymmh6[16];		/* YMMH 6  */
+    uint8_t             fpu_ymmh7[16];		/* YMMH 7  */
+    uint8_t             fpu_k0[8];          /* K0 */
+    uint8_t             fpu_k1[8];          /* K1 */
+    uint8_t             fpu_k2[8];          /* K2 */
+    uint8_t             fpu_k3[8];          /* K3 */
+    uint8_t             fpu_k4[8];          /* K4 */
+    uint8_t             fpu_k5[8];          /* K5 */
+    uint8_t             fpu_k6[8];          /* K6 */
+    uint8_t             fpu_k7[8];          /* K7 */
+    uint8_t             fpu_zmmh0[32];      /* ZMMH 0  */
+    uint8_t             fpu_zmmh1[32];      /* ZMMH 1  */
+    uint8_t             fpu_zmmh2[32];      /* ZMMH 2  */
+    uint8_t             fpu_zmmh3[32];      /* ZMMH 3  */
+    uint8_t             fpu_zmmh4[32];      /* ZMMH 4  */
+    uint8_t             fpu_zmmh5[32];      /* ZMMH 5  */
+    uint8_t             fpu_zmmh6[32];      /* ZMMH 6  */
+    uint8_t             fpu_zmmh7[32];      /* ZMMH 7  */
+};
+typedef struct x86_avx512_state32 x86_avx512_state32_t;
+#define x86_AVX512_STATE32_COUNT ((uint32_t) (sizeof (struct x86_avx512_state32) / sizeof (uint32_t)))
+
+struct x86_exception_state32
+{
+    uint16_t trapno;
+    uint16_t cpu;
+    uint32_t err;
+    uint32_t faultvaddr;
+};
+typedef struct x86_exception_state32 x86_exception_state32_t;
+#define i386_EXCEPTION_STATE_COUNT ((uint32_t) (sizeof (struct x86_exception_state32) / sizeof (uint32_t)))
+#define x86_EXCEPTION_STATE32_COUNT i386_EXCEPTION_STATE_COUNT
+
+struct x86_debug_state32
+{
+    uint32_t dr0;
+    uint32_t dr1;
+    uint32_t dr2;
+    uint32_t dr3;
+    uint32_t dr4;
+    uint32_t dr5;
+    uint32_t dr6;
+    uint32_t dr7;
+};
+typedef struct x86_debug_state32 x86_debug_state32_t;
+#define x86_DEBUG_STATE32_COUNT ((uint32_t) (sizeof (struct x86_debug_state32) / sizeof (uint32_t)))
+
+struct x86_instruction_state
+{
+    int32_t insn_stream_valid_bytes;
+    int32_t insn_offset;
+    int32_t out_of_synch;
+    /*
+     * non-zero when the cacheline that includes the insn_offset
+     * is replaced in the insn_bytes array due to a mismatch
+     * detected when comparing it with the same cacheline in memory
+     */
+#define x86_INSTRUCTION_STATE_MAX_INSN_BYTES    (2448 - 64 - 4)
+    uint8_t	insn_bytes[x86_INSTRUCTION_STATE_MAX_INSN_BYTES];
+#define x86_INSTRUCTION_STATE_CACHELINE_SIZE	64
+    uint8_t	insn_cacheline[x86_INSTRUCTION_STATE_CACHELINE_SIZE];
+};
+typedef struct x86_instruction_state x86_instruction_state_t;
+#define x86_INSTRUCTION_STATE_COUNT ((uint32_t) (sizeof (struct x86_instruction_state) / sizeof (uint32_t)))
+
+/*
+ * x86_64 bit versions
+ */
+struct x86_thread_state64
+{
+	uint64_t rax;
+	uint64_t rbx;
+	uint64_t rcx;
+	uint64_t rdx;
+	uint64_t rdi;
+	uint64_t rsi;
+	uint64_t rbp;
+	uint64_t rsp;
+	uint64_t r8;
+	uint64_t r9;
+	uint64_t r10;
+	uint64_t r11;
+	uint64_t r12;
+	uint64_t r13;
+	uint64_t r14;
+	uint64_t r15;
+	uint64_t rip;
+	uint64_t rflags;
+	uint64_t cs;
+	uint64_t fs;
+	uint64_t gs;
+};
+typedef struct x86_thread_state64 x86_thread_state64_t;
+#define x86_THREAD_STATE64_COUNT ((uint32_t) (sizeof (struct x86_thread_state64) / sizeof (uint32_t)))
+
+struct x86_thread_full_state64
+{
+    struct x86_thread_state64 ss64;
+    uint64_t                  ds;
+    uint64_t                  es;
+    uint64_t                  ss;
+    uint64_t                  gsbase;
+};
+typedef struct x86_thread_full_state64 x86_thread_full_state64_t;
+#define x86_THREAD_FULL_STATE64_COUNT ((uint32_t) (sizeof (struct x86_thread_full_state64) / sizeof (uint32_t)))
+
+struct x86_float_state64
+{
+    int32_t             fpu_reserved[2];
+    uint16_t            fpu_fcw;         /* x87 FPU control word */
+    uint16_t            fpu_fsw;         /* x87 FPU status word */
+    uint8_t             fpu_ftw;         /* x87 FPU tag word */
+    uint8_t             fpu_rsrv1;       /* reserved */ 
+    uint16_t            fpu_fop;         /* x87 FPU Opcode */
+
+    /* x87 FPU Instruction Pointer */
+    uint32_t            fpu_ip;          /* offset */
+    uint16_t            fpu_cs;          /* Selector */
+
+    uint16_t            fpu_rsrv2;       /* reserved */
+
+    /* x87 FPU Instruction Operand(Data) Pointer */
+    uint32_t            fpu_dp;          /* offset */
+    uint16_t            fpu_ds;          /* Selector */
+
+    uint16_t            fpu_rsrv3;       /* reserved */
+    uint32_t            fpu_mxcsr;       /* MXCSR Register state */
+    uint32_t            fpu_mxcsrmask;   /* MXCSR mask */
+    struct x86_mmst_reg fpu_stmm0;       /* ST0/MM0   */
+    struct x86_mmst_reg fpu_stmm1;       /* ST1/MM1  */
+    struct x86_mmst_reg fpu_stmm2;       /* ST2/MM2  */
+    struct x86_mmst_reg fpu_stmm3;       /* ST3/MM3  */
+    struct x86_mmst_reg fpu_stmm4;       /* ST4/MM4  */
+    struct x86_mmst_reg fpu_stmm5;       /* ST5/MM5  */
+    struct x86_mmst_reg fpu_stmm6;       /* ST6/MM6  */
+    struct x86_mmst_reg fpu_stmm7;       /* ST7/MM7  */
+    uint8_t             fpu_xmm0[16];    /* XMM 0  */
+    uint8_t             fpu_xmm1[16];    /* XMM 1  */
+    uint8_t             fpu_xmm2[16];    /* XMM 2  */
+    uint8_t             fpu_xmm3[16];    /* XMM 3  */
+    uint8_t             fpu_xmm4[16];    /* XMM 4  */
+    uint8_t             fpu_xmm5[16];    /* XMM 5  */
+    uint8_t             fpu_xmm6[16];    /* XMM 6  */
+    uint8_t             fpu_xmm7[16];    /* XMM 7  */
+    uint8_t             fpu_xmm8[16];    /* XMM 8  */
+    uint8_t             fpu_xmm9[16];    /* XMM 9  */
+    uint8_t             fpu_xmm10[16];   /* XMM 10  */
+    uint8_t             fpu_xmm11[16];   /* XMM 11 */
+    uint8_t             fpu_xmm12[16];   /* XMM 12  */
+    uint8_t             fpu_xmm13[16];   /* XMM 13  */
+    uint8_t             fpu_xmm14[16];   /* XMM 14  */
+    uint8_t             fpu_xmm15[16];   /* XMM 15  */
+    int8_t              fpu_rsrv4[6*16]; /* reserved */
+    int32_t             fpu_reserved1;
+};
+typedef struct x86_float_state64 x86_float_state64_t;
+#define x86_FLOAT_STATE64_COUNT ((uint32_t) (sizeof (struct x86_float_state64) / sizeof (uint32_t)))
+
+struct x86_avx_state64
+{
+    int32_t             fpu_reserved[2];
+    uint64_t            fpu_fcw;         /* x87 FPU control word */
+    uint64_t            fpu_fsw;         /* x87 FPU status word */
+    uint8_t             fpu_ftw;         /* x87 FPU tag word */
+    uint8_t             fpu_rsrv1;       /* reserved */ 
+    uint16_t            fpu_fop;         /* x87 FPU Opcode */
+
+    /* x87 FPU Instruction Pointer */
+    uint32_t            fpu_ip;          /* offset */
+    uint16_t            fpu_cs;          /* Selector */
+
+    uint16_t            fpu_rsrv2;       /* reserved */
+
+    /* x87 FPU Instruction Operand(Data) Pointer */
+    uint32_t            fpu_dp;          /* offset */
+    uint16_t            fpu_ds;          /* Selector */
+
+    uint16_t            fpu_rsrv3;       /* reserved */
+    uint32_t            fpu_mxcsr;       /* MXCSR Register state */
+    uint32_t            fpu_mxcsrmask;   /* MXCSR mask */
+    struct x86_mmst_reg fpu_stmm0;       /* ST0/MM0   */
+    struct x86_mmst_reg fpu_stmm1;       /* ST1/MM1  */
+    struct x86_mmst_reg fpu_stmm2;       /* ST2/MM2  */
+    struct x86_mmst_reg fpu_stmm3;       /* ST3/MM3  */
+    struct x86_mmst_reg fpu_stmm4;       /* ST4/MM4  */
+    struct x86_mmst_reg fpu_stmm5;       /* ST5/MM5  */
+    struct x86_mmst_reg fpu_stmm6;       /* ST6/MM6  */
+    struct x86_mmst_reg fpu_stmm7;       /* ST7/MM7  */
+    uint8_t             fpu_xmm0[16];    /* XMM 0  */
+    uint8_t             fpu_xmm1[16];    /* XMM 1  */
+    uint8_t             fpu_xmm2[16];    /* XMM 2  */
+    uint8_t             fpu_xmm3[16];    /* XMM 3  */
+    uint8_t             fpu_xmm4[16];    /* XMM 4  */
+    uint8_t             fpu_xmm5[16];    /* XMM 5  */
+    uint8_t             fpu_xmm6[16];    /* XMM 6  */
+    uint8_t             fpu_xmm7[16];    /* XMM 7  */
+    uint8_t             fpu_xmm8[16];    /* XMM 8  */
+    uint8_t             fpu_xmm9[16];    /* XMM 9  */
+    uint8_t             fpu_xmm10[16];   /* XMM 10  */
+    uint8_t             fpu_xmm11[16];   /* XMM 11 */
+    uint8_t             fpu_xmm12[16];   /* XMM 12  */
+    uint8_t             fpu_xmm13[16];   /* XMM 13  */
+    uint8_t             fpu_xmm14[16];   /* XMM 14  */
+    uint8_t             fpu_xmm15[16];   /* XMM 15  */
+    int8_t              fpu_rsrv4[6*16]; /* reserved */
+    int32_t             fpu_reserved1;
+    int8_t              avx_reserved1[64];
+    uint8_t             fpu_ymmh0[16];   /* YMMH 0  */
+    uint8_t             fpu_ymmh1[16];   /* YMMH 1  */
+    uint8_t             fpu_ymmh2[16];   /* YMMH 2  */
+    uint8_t             fpu_ymmh3[16];   /* YMMH 3  */
+    uint8_t             fpu_ymmh4[16];   /* YMMH 4  */
+    uint8_t             fpu_ymmh5[16];   /* YMMH 5  */
+    uint8_t             fpu_ymmh6[16];   /* YMMH 6  */
+    uint8_t             fpu_ymmh7[16];   /* YMMH 7  */
+    uint8_t             fpu_ymmh8[16];   /* YMMH 8  */
+    uint8_t             fpu_ymmh9[16];   /* YMMH 9  */
+    uint8_t             fpu_ymmh10[16];  /* YMMH 10  */
+    uint8_t             fpu_ymmh11[16];  /* YMMH 11  */
+    uint8_t             fpu_ymmh12[16];  /* YMMH 12  */
+    uint8_t             fpu_ymmh13[16];  /* YMMH 13  */
+    uint8_t             fpu_ymmh14[16];  /* YMMH 14  */
+    uint8_t             fpu_ymmh15[16];  /* YMMH 15  */
+};
+typedef struct x86_avx_state64 x86_avx_state64_t;
+#define x86_AVX_STATE64_COUNT ((uint32_t) (sizeof (struct x86_avx_state64) / sizeof (uint32_t)))
+
+struct x86_avx512_state64
+{
+    int32_t             fpu_reserved[2];
+    uint16_t            fpu_fcw;           /* x87 FPU control word */
+    uint16_t            fpu_fsw;           /* x87 FPU status word */
+    uint8_t             fpu_ftw;           /* x87 FPU tag word */
+    uint8_t             fpu_rsrv1;         /* reserved */ 
+    uint16_t            fpu_fop;           /* x87 FPU Opcode */
+
+    /* x87 FPU Instruction Pointer */
+    uint32_t            fpu_ip;            /* offset */
+    uint16_t            fpu_cs;            /* Selector */
+
+    uint16_t            fpu_rsrv2;         /* reserved */
+
+    /* x87 FPU Instruction Operand(Data) Pointer */
+    uint32_t            fpu_dp;            /* offset */
+    uint16_t            fpu_ds;            /* Selector */
+
+    uint16_t            fpu_rsrv3;         /* reserved */
+    uint32_t            fpu_mxcsr;         /* MXCSR Register state */
+    uint32_t            fpu_mxcsrmask;     /* MXCSR mask */
+    struct x86_mmst_reg fpu_stmm0;         /* ST0/MM0   */
+    struct x86_mmst_reg fpu_stmm1;         /* ST1/MM1  */
+    struct x86_mmst_reg fpu_stmm2;         /* ST2/MM2  */
+    struct x86_mmst_reg fpu_stmm3;         /* ST3/MM3  */
+    struct x86_mmst_reg fpu_stmm4;         /* ST4/MM4  */
+    struct x86_mmst_reg fpu_stmm5;         /* ST5/MM5  */
+    struct x86_mmst_reg fpu_stmm6;         /* ST6/MM6  */
+    struct x86_mmst_reg fpu_stmm7;         /* ST7/MM7  */
+    uint8_t             fpu_xmm0[16];      /* XMM 0  */
+    uint8_t             fpu_xmm1[16];      /* XMM 1  */
+    uint8_t             fpu_xmm2[16];      /* XMM 2  */
+    uint8_t             fpu_xmm3[16];      /* XMM 3  */
+    uint8_t             fpu_xmm4[16];      /* XMM 4  */
+    uint8_t             fpu_xmm5[16];      /* XMM 5  */
+    uint8_t             fpu_xmm6[16];      /* XMM 6  */
+    uint8_t             fpu_xmm7[16];      /* XMM 7  */
+    uint8_t             fpu_xmm8[16];      /* XMM 8  */
+    uint8_t             fpu_xmm9[16];      /* XMM 9  */
+    uint8_t             fpu_xmm10[16];     /* XMM 10  */
+    uint8_t             fpu_xmm11[16];     /* XMM 11 */
+    uint8_t             fpu_xmm12[16];     /* XMM 12  */
+    uint8_t             fpu_xmm13[16];     /* XMM 13  */
+    uint8_t             fpu_xmm14[16];     /* XMM 14  */
+    uint8_t             fpu_xmm15[16];     /* XMM 15  */
+    int8_t              fpu_rsrv4[6*16];   /* reserved */
+    int32_t             fpu_reserved1;
+    int8_t              avx_reserved1[64];
+    uint8_t             fpu_ymmh0[16];     /* YMMH 0  */
+    uint8_t             fpu_ymmh1[16];     /* YMMH 1  */
+    uint8_t             fpu_ymmh2[16];     /* YMMH 2  */
+    uint8_t             fpu_ymmh3[16];     /* YMMH 3  */
+    uint8_t             fpu_ymmh4[16];     /* YMMH 4  */
+    uint8_t             fpu_ymmh5[16];     /* YMMH 5  */
+    uint8_t             fpu_ymmh6[16];     /* YMMH 6  */
+    uint8_t             fpu_ymmh7[16];     /* YMMH 7  */
+    uint8_t             fpu_ymmh8[16];     /* YMMH 8  */
+    uint8_t             fpu_ymmh9[16];     /* YMMH 9  */
+    uint8_t             fpu_ymmh10[16];    /* YMMH 10  */
+    uint8_t             fpu_ymmh11[16];    /* YMMH 11  */
+    uint8_t             fpu_ymmh12[16];    /* YMMH 12  */
+    uint8_t             fpu_ymmh13[16];    /* YMMH 13  */
+    uint8_t             fpu_ymmh14[16];    /* YMMH 14  */
+    uint8_t             fpu_ymmh15[16];    /* YMMH 15  */
+    uint8_t             fpu_k0[8];         /* K0 */
+    uint8_t             fpu_k1[8];         /* K1 */
+    uint8_t             fpu_k2[8];         /* K2 */
+    uint8_t             fpu_k3[8];         /* K3 */
+    uint8_t             fpu_k4[8];         /* K4 */
+    uint8_t             fpu_k5[8];         /* K5 */
+    uint8_t             fpu_k6[8];         /* K6 */
+    uint8_t             fpu_k7[8];         /* K7 */
+    uint8_t             fpu_zmmh0[32];     /* ZMMH 0  */
+    uint8_t             fpu_zmmh1[32];     /* ZMMH 1  */
+    uint8_t             fpu_zmmh2[32];     /* ZMMH 2  */
+    uint8_t             fpu_zmmh3[32];     /* ZMMH 3  */
+    uint8_t             fpu_zmmh4[32];     /* ZMMH 4  */
+    uint8_t             fpu_zmmh5[32];     /* ZMMH 5  */
+    uint8_t             fpu_zmmh6[32];     /* ZMMH 6  */
+    uint8_t             fpu_zmmh7[32];     /* ZMMH 7  */
+    uint8_t             fpu_zmmh8[32];     /* ZMMH 8  */
+    uint8_t             fpu_zmmh9[32];     /* ZMMH 9  */
+    uint8_t             fpu_zmmh10[32];    /* ZMMH 10  */
+    uint8_t             fpu_zmmh11[32];    /* ZMMH 11  */
+    uint8_t             fpu_zmmh12[32];    /* ZMMH 12  */
+    uint8_t             fpu_zmmh13[32];    /* ZMMH 13  */
+    uint8_t             fpu_zmmh14[32];    /* ZMMH 14  */
+    uint8_t             fpu_zmmh15[32];    /* ZMMH 15  */
+    uint8_t             fpu_zmm16[64];     /* ZMM 16  */
+    uint8_t             fpu_zmm17[64];     /* ZMM 17  */
+    uint8_t             fpu_zmm18[64];     /* ZMM 18  */
+    uint8_t             fpu_zmm19[64];     /* ZMM 19  */
+    uint8_t             fpu_zmm20[64];     /* ZMM 20  */
+    uint8_t             fpu_zmm21[64];     /* ZMM 21  */
+    uint8_t             fpu_zmm22[64];     /* ZMM 22  */
+    uint8_t             fpu_zmm23[64];     /* ZMM 23  */
+    uint8_t             fpu_zmm24[64];     /* ZMM 24  */
+    uint8_t             fpu_zmm25[64];     /* ZMM 25  */
+    uint8_t             fpu_zmm26[64];     /* ZMM 26  */
+    uint8_t             fpu_zmm27[64];     /* ZMM 27  */
+    uint8_t             fpu_zmm28[64];     /* ZMM 28  */
+    uint8_t             fpu_zmm29[64];     /* ZMM 29  */
+    uint8_t             fpu_zmm30[64];     /* ZMM 30  */
+    uint8_t             fpu_zmm31[64];     /* ZMM 31  */
+};
+typedef struct x86_avx512_state64 x86_avx512_state64_t;
+#define x86_AVX512_STATE64_COUNT ((uint32_t) (sizeof (struct x86_avx512_state64) / sizeof (uint32_t)))
+
+struct x86_exception_state64
+{
+    uint16_t trapno;
+    uint16_t cpu;
+    uint32_t err;
+    uint64_t faultvaddr;
+};
+typedef struct x86_exception_state64 x86_exception_state64_t;
+#define x86_EXCEPTION_STATE64_COUNT ((uint32_t) (sizeof (struct x86_exception_state64) / sizeof (uint32_t)))
+
+struct x86_debug_state64
+{
+    uint64_t dr0;
+    uint64_t dr1;
+    uint64_t dr2;
+    uint64_t dr3;
+    uint64_t dr4;
+    uint64_t dr5;
+    uint64_t dr6;
+    uint64_t dr7;
+};
+typedef struct x86_debug_state64 x86_debug_state64_t;
+#define x86_DEBUG_STATE64_COUNT ((uint32_t) (sizeof (struct x86_debug_state64) / sizeof (uint32_t)))
+
+struct x86_cpmu_state64
+{
+    uint64_t ctrs[16];
+};
+typedef struct x86_cpmu_state64 x86_cpmu_state64_t;
+
+struct x86_last_branch_record
+{
+    uint64_t from_ip;
+    uint64_t to_ip;
+    uint32_t mispredict;
+    // uint32_t mispredict : 1,
+    //     tsx_abort  : 1,
+    //     in_tsx     : 1,
+    //     cycle_count: 16,
+    //     reserved   : 13;
+};
+typedef struct x86_last_branch_record x86_last_branch_record_t;
+
+struct x86_last_branch_state
+{
+    int32_t                       lbr_count;
+    uint32_t                      lbr_supported_tsx;
+    // uint32_t                   lbr_supported_tsx : 1,
+    //                            lbr_supported_cycle_count : 1,
+    //                            reserved : 30;
+#   define x86_LASTBRANCH_MAX  32
+    struct x86_last_branch_record lbrs[x86_LASTBRANCH_MAX];
+};
+typedef struct x86_last_branch_state x86_last_branch_state_t;
+#define x86_LAST_BRANCH_STATE_COUNT ((uint32_t) (sizeof (struct x86_last_branch_record) / sizeof (uint32_t)))
+
+struct x86_pagein_state
+{
+    int32_t pagein_error;
+};
+typedef struct x86_pagein_state x86_pagein_state_t;
+#define x86_PAGEIN_STATE_COUNT ((uint32_t) (sizeof (struct x86_pagein_state) / sizeof (uint32_t)))
+
+/*
+ * ARM Thread Flavors
+ * Reference:
+ * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/arm/thread_status.h#L52-L157
+ */
+#define ARM_THREAD_STATE         1
+#define ARM_UNIFIED_THREAD_STATE ARM_THREAD_STATE
+#define ARM_VFP_STATE            2
+#define ARM_EXCEPTION_STATE      3
+#define ARM_DEBUG_STATE          4 /* pre-armv8 */
+#define ARM_THREAD_STATE_NONE    5
+#define ARM_THREAD_STATE64       6
+#define ARM_EXCEPTION_STATE64    7
+#define ARM_THREAD_STATE_LAST    8 /* legacy */
+#define ARM_THREAD_STATE32       9
+#define ARM_EXCEPTION_STATE64_V2 10
+
+/* API */
+#define ARM_DEBUG_STATE32        14
+#define ARM_DEBUG_STATE64        15
+#define ARM_NEON_STATE           16
+#define ARM_NEON_STATE64         17
+#define ARM_CPMU_STATE64         18
+
+#ifdef XNU_KERNEL_PRIVATE
+/* For kernel use */
+#define ARM_SAVED_STATE32        20
+#define ARM_SAVED_STATE64        21
+#define ARM_NEON_SAVED_STATE32   22
+#define ARM_NEON_SAVED_STATE64   23
+#endif /* XNU_KERNEL_PRIVATE */
+
+#define ARM_PAGEIN_STATE         27
+
+/* API */
+#define ARM_SME_STATE            28
+#define ARM_SVE_Z_STATE1         29
+#define ARM_SVE_Z_STATE2         30
+#define ARM_SVE_P_STATE          31
+#define ARM_SME_ZA_STATE1        32
+#define ARM_SME_ZA_STATE2        33
+#define ARM_SME_ZA_STATE3        34
+#define ARM_SME_ZA_STATE4        35
+#define ARM_SME_ZA_STATE5        36
+#define ARM_SME_ZA_STATE6        37
+#define ARM_SME_ZA_STATE7        38
+#define ARM_SME_ZA_STATE8        39
+#define ARM_SME_ZA_STATE9        40
+#define ARM_SME_ZA_STATE10       41
+#define ARM_SME_ZA_STATE11       42
+#define ARM_SME_ZA_STATE12       42
+#define ARM_SME_ZA_STATE13       44
+#define ARM_SME_ZA_STATE14       45
+#define ARM_SME_ZA_STATE15       46
+#define ARM_SME_ZA_STATE16       47
+#define ARM_SME2_STATE           48
+#define ARM_SME_SAVED_STATE      49
+#define ARM_THREAD_STATE_FLAVORS 50 /* This must be updated to 1 more than the highest numerical state flavor */
+
+#ifndef ARM_STATE_FLAVOR_IS_OTHER_VALID
+#define ARM_STATE_FLAVOR_IS_OTHER_VALID(_flavor_) 0
+#endif
+
+#define ARM_FLAVOR_MODIFIES_CORE_CPU_REGISTERS(x) \
+((x == ARM_THREAD_STATE) ||     \
+ (x == ARM_THREAD_STATE32) ||   \
+ (x == ARM_THREAD_STATE64))
+
+#define ARM_VALID_THREAD_STATE_FLAVOR(x) \
+    ((x == ARM_THREAD_STATE) ||           \
+     (x == ARM_VFP_STATE) ||              \
+     (x == ARM_EXCEPTION_STATE) ||        \
+     (x == ARM_DEBUG_STATE) ||            \
+     (x == ARM_THREAD_STATE_NONE) ||          \
+     (x == ARM_THREAD_STATE32) ||         \
+     (x == ARM_THREAD_STATE64) ||         \
+     (x == ARM_EXCEPTION_STATE64) ||      \
+     (x == ARM_EXCEPTION_STATE64_V2) ||      \
+     (x == ARM_NEON_STATE) ||             \
+     (x == ARM_NEON_STATE64) ||           \
+     (x == ARM_DEBUG_STATE32) ||          \
+     (x == ARM_DEBUG_STATE64) ||          \
+     (x == ARM_PAGEIN_STATE) ||           \
+     (ARM_STATE_FLAVOR_IS_OTHER_VALID(x)))
+
+// Reference:
+// https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/arm/_structs.h#L87-L107
+struct arm_exception_state32
+{
+    uint32_t exception;   /* number of arm exception taken */
+    uint32_t fsr;         /* Fault status */
+    uint32_t far;         /* Virtual Fault Address */
+};
+struct arm_exception_state64
+{
+    uint64_t far;         /* Virtual Fault Address */
+    uint64_t esr;         /* Exception syndrome */
+    uint32_t exception;   /* number of arm exception taken */
+};
+struct arm_exception_state64_v2
+{
+    uint64_t far;         /* Virtual Fault Address */
+    uint64_t esr;         /* Exception syndrome */
+};
+
+struct arm_thread_state32
+{
+    uint32_t r[13]; /* General purpose register r0-r12 */
+    uint32_t sp;    /* Stack pointer r13 */
+    uint32_t lr;    /* Link register r14 */
+    uint32_t pc;    /* Program counter r15 */
+    uint32_t cpsr;  /* Current program status register */
+};
+struct arm_thread_state64
+{
+    uint64_t x[29]; /* General purpose registers x0-x28 */
+    uint64_t fp;    /* Frame pointer x29 */
+    uint64_t lr;    /* Link register x30 */
+    uint64_t sp;    /* Stack pointer x31 */
+    uint64_t pc;    /* Program counter */
+    uint32_t cpsr;  /* Current program status register */
+    uint32_t flags; /* Flags describing structure format */
+};
+
+struct arm_vfp_state32
+{
+    uint32_t r[64];
+    uint32_t fpscr;
+};
+
+struct arm_neon_state64
+{
+    uint128_t  v[32];
+    uint32_t   fpsr;
+    uint32_t   fpcr;
+};
+
+struct arm_pagein_state
+{
+    int32_t pagein_error;
+};
+
+struct arm_sme_state
+{
+    uint64_t svcr;
+    uint64_t tpidr2_el0;
+    uint16_t svl_b;
+};
+
+struct arm_sve_z_state
+{
+    uint8_t z[16][256];
+} CC_align(4);
+
+struct arm_sve_p_state
+{
+    uint8_t p[16][256 / 8];
+} CC_align(4);
+
+struct arm_sme_za_state
+{
+    uint8_t za[4096];
+} CC_align(4);
+
+struct arm_sme2_state
+{
+    uint8_t zt0[64];
+} CC_align(4);
+
+struct arm_debug_state
+{
+    uint32_t bvr[16];
+    uint32_t bcr[16];
+    uint32_t wvr[16];
+    uint32_t wcr[16];
+};
+
+struct arm_legacy_debug_state
+{
+    uint32_t bvr[16];
+    uint32_t bcr[16];
+    uint32_t wvr[16];
+    uint32_t wcr[16];
+};
+
+struct arm_debug_state32
+{
+    uint32_t bvr[16];
+    uint32_t bcr[16];
+    uint32_t wvr[16];
+    uint32_t wcr[16];
+    uint64_t mdscr_el1; /* Bit 0 is SS (Hardware Single Step) */
+};
+
+struct arm_debug_state64
+{
+    uint64_t bvr[16];
+    uint64_t bcr[16];
+    uint64_t wvr[16];
+    uint64_t wcr[16];
+    uint64_t mdscr_el1; /* Bit 0 is SS (Hardware Single Step) */
+};
+
+struct arm_cpmu_state64
+{
+    uint64_t ctrs[16];
+};
