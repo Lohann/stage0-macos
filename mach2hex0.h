@@ -2034,7 +2034,8 @@ enum reloc_type_x86_64
 #define x86_DEBUG_STATE64               11
 #define x86_DEBUG_STATE                 12
 #define x86_THREAD_STATE_NONE           13
-/* 14 and 15 are used for the internal x86_SAVED_STATE flavours */
+#define x86_SAVED_STATE32               14 /* internal */
+#define x86_SAVED_STATE64               15 /* internal */
 /* Arrange for flavors to take sequential values, 32-bit, 64-bit, non-specific */
 #define x86_AVX_STATE32                 16
 #define x86_AVX_STATE64                 (x86_AVX_STATE32 + 1)
@@ -2046,13 +2047,10 @@ enum reloc_type_x86_64
 #define x86_THREAD_FULL_STATE64         23
 #define x86_INSTRUCTION_STATE           24
 #define x86_LAST_BRANCH_STATE           25
-#define x86_THREAD_STATE_FLAVORS        26 /* This must be updated to 1 more than the highest numerical state flavor */
+#define x86_THREAD_STATE_FLAVORS        26  /* This must be updated to 1 more than the highest numerical state flavor */
 
-/*
- * Largest state on this machine:
- * (be sure mach/machine/thread_state.h matches!)
- */
-#define THREAD_MACHINE_STATE_MAX        THREAD_STATE_MAX
+/* Size of maximum exported thread state in 32-bit words */
+#define I386_THREAD_STATE_MAX           614 /* Size of biggest state possible */
 
 #define x86_FLAVOR_MODIFIES_CORE_CPU_REGISTERS(x) \
 ((x == x86_THREAD_STATE) ||     \
@@ -2654,6 +2652,86 @@ typedef struct x86_pagein_state x86_pagein_state_t;
 #define x86_PAGEIN_STATE_COUNT ((uint32_t) (sizeof (struct x86_pagein_state) / sizeof (uint32_t)))
 
 /*
+ * The format in which thread state is saved by Mach on this machine.  This
+ * state flavor is most efficient for exception RPC's to kernel-loaded
+ * servers, because copying can be avoided:
+ */
+struct x86_saved_state32 {
+    uint32_t gs;
+    uint32_t fs;
+    uint32_t es;
+    uint32_t ds;
+    uint32_t edi;
+    uint32_t esi;
+    uint32_t ebp;
+    uint32_t cr2;    /* kernel esp stored by pusha - we save cr2 here later */
+    uint32_t ebx;
+    uint32_t edx;
+    uint32_t ecx;
+    uint32_t eax;
+    uint16_t trapno;
+    uint16_t cpu;
+    uint32_t err;
+    uint32_t eip;
+    uint32_t cs;
+    uint32_t efl;
+    uint32_t uesp;
+    uint32_t ss;
+};
+typedef struct x86_saved_state32 x86_saved_state32_t;
+#define x86_SAVED_STATE32_COUNT ((uint32_t)(sizeof (struct x86_saved_state32)/sizeof(uint32_t)))
+
+/*
+ * This is the state pushed onto the 64-bit interrupt stack
+ * on any exception/trap/interrupt.
+ */
+struct x86_64_intr_stack_frame {
+	uint16_t        trapno;
+	uint16_t        cpu;
+	uint32_t        _pad;
+	uint64_t        trapfn;
+	uint64_t        err;
+	uint64_t        rip;
+	uint64_t        cs;
+	uint64_t        rflags;
+	uint64_t        rsp;
+	uint64_t        ss;
+};
+typedef struct x86_64_intr_stack_frame x86_64_intr_stack_frame_t;
+
+/*
+ * thread state format for task running in 64bit long mode
+ * in long mode, the same hardware frame is always pushed regardless
+ * of whether there was a change in privilege level... therefore, there
+ * is no need for an x86_saved_state64_from_kernel variant
+ */
+struct x86_saved_state64 {
+    uint64_t                       rdi; /* arg0 for system call */
+    uint64_t                       rsi;
+    uint64_t                       rdx;
+    uint64_t                       r10; /* R10 := RCX prior to syscall trap */
+    uint64_t                       r8;
+    uint64_t                       r9;  /* arg5 for system call */
+    uint64_t                       cr2;
+    uint64_t                       r15;
+    uint64_t                       r14;
+    uint64_t                       r13;
+    uint64_t                       r12;
+    uint64_t                       r11;
+    uint64_t                       rbp;
+    uint64_t                       rbx;
+    uint64_t                       rcx;
+    uint64_t                       rax;
+    uint32_t                       gs;
+    uint32_t                       fs;
+    uint32_t                       ds;
+    uint32_t                       es;
+    struct x86_64_intr_stack_frame isf;
+};
+typedef struct x86_saved_state64 x86_saved_state64_t;
+#define x86_SAVED_STATE64_COUNT ((uint32_t)(sizeof (struct x86_saved_state64)/sizeof(uint32_t)))
+
+/*
  * ARM Thread Flavors
  * Reference:
  * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/arm/thread_status.h#L52-L157
@@ -2677,13 +2755,11 @@ typedef struct x86_pagein_state x86_pagein_state_t;
 #define ARM_NEON_STATE64         17
 #define ARM_CPMU_STATE64         18
 
-#ifdef XNU_KERNEL_PRIVATE
 /* For kernel use */
 #define ARM_SAVED_STATE32        20
 #define ARM_SAVED_STATE64        21
 #define ARM_NEON_SAVED_STATE32   22
 #define ARM_NEON_SAVED_STATE64   23
-#endif /* XNU_KERNEL_PRIVATE */
 
 #define ARM_PAGEIN_STATE         27
 
@@ -2703,7 +2779,7 @@ typedef struct x86_pagein_state x86_pagein_state_t;
 #define ARM_SME_ZA_STATE9        40
 #define ARM_SME_ZA_STATE10       41
 #define ARM_SME_ZA_STATE11       42
-#define ARM_SME_ZA_STATE12       42
+#define ARM_SME_ZA_STATE12       43
 #define ARM_SME_ZA_STATE13       44
 #define ARM_SME_ZA_STATE14       45
 #define ARM_SME_ZA_STATE15       46
@@ -2717,20 +2793,20 @@ typedef struct x86_pagein_state x86_pagein_state_t;
 #endif
 
 #define ARM_FLAVOR_MODIFIES_CORE_CPU_REGISTERS(x) \
-((x == ARM_THREAD_STATE) ||     \
+((x == ARM_THREAD_STATE)   ||   \
  (x == ARM_THREAD_STATE32) ||   \
  (x == ARM_THREAD_STATE64))
 
-#define ARM_VALID_THREAD_STATE_FLAVOR(x) \
+#define ARM_VALID_THREAD_STATE_FLAVOR(x)  \
     ((x == ARM_THREAD_STATE) ||           \
      (x == ARM_VFP_STATE) ||              \
      (x == ARM_EXCEPTION_STATE) ||        \
      (x == ARM_DEBUG_STATE) ||            \
-     (x == ARM_THREAD_STATE_NONE) ||          \
+     (x == ARM_THREAD_STATE_NONE) ||      \
      (x == ARM_THREAD_STATE32) ||         \
      (x == ARM_THREAD_STATE64) ||         \
      (x == ARM_EXCEPTION_STATE64) ||      \
-     (x == ARM_EXCEPTION_STATE64_V2) ||      \
+     (x == ARM_EXCEPTION_STATE64_V2) ||   \
      (x == ARM_NEON_STATE) ||             \
      (x == ARM_NEON_STATE64) ||           \
      (x == ARM_DEBUG_STATE32) ||          \
@@ -2746,17 +2822,22 @@ struct arm_exception_state32
     uint32_t fsr;         /* Fault status */
     uint32_t far;         /* Virtual Fault Address */
 };
+#define ARM_EXCEPTION_STATE32_COUNT ((uint32_t)(sizeof(struct arm_exception_state32)/sizeof(uint32_t)))
+
 struct arm_exception_state64
 {
     uint64_t far;         /* Virtual Fault Address */
     uint64_t esr;         /* Exception syndrome */
     uint32_t exception;   /* number of arm exception taken */
 };
+#define ARM_EXCEPTION_STATE64_COUNT ((uint32_t)(sizeof(struct arm_exception_state64)/sizeof(uint32_t)))
+
 struct arm_exception_state64_v2
 {
     uint64_t far;         /* Virtual Fault Address */
     uint64_t esr;         /* Exception syndrome */
 };
+#define ARM_EXCEPTION_STATE64_V2_COUNT ((uint32_t)(sizeof(struct arm_exception_state64_v2)/sizeof(uint32_t)))
 
 struct arm_thread_state32
 {
@@ -2766,6 +2847,8 @@ struct arm_thread_state32
     uint32_t pc;    /* Program counter r15 */
     uint32_t cpsr;  /* Current program status register */
 };
+#define ARM_THREAD_STATE32_COUNT ((uint32_t)(sizeof(struct arm_thread_state32)/sizeof(uint32_t)))
+
 struct arm_thread_state64
 {
     uint64_t x[29]; /* General purpose registers x0-x28 */
@@ -2776,12 +2859,14 @@ struct arm_thread_state64
     uint32_t cpsr;  /* Current program status register */
     uint32_t flags; /* Flags describing structure format */
 };
+#define ARM_THREAD_STATE64_COUNT ((uint32_t)(sizeof(struct arm_thread_state64)/sizeof(uint32_t)))
 
-struct arm_vfp_state32
+struct arm_vfp_state
 {
     uint32_t r[64];
     uint32_t fpscr;
 };
+#define ARM_VFP_STATE_COUNT ((uint32_t)(sizeof(struct arm_vfp_state)/sizeof(uint32_t)))
 
 struct arm_neon_state64
 {
@@ -2789,11 +2874,13 @@ struct arm_neon_state64
     uint32_t   fpsr;
     uint32_t   fpcr;
 };
+#define ARM_NEON_STATE64_COUNT ((uint32_t)(sizeof(struct arm_neon_state64)/sizeof(uint32_t)))
 
 struct arm_pagein_state
 {
     int32_t pagein_error;
 };
+#define ARM_PAGEIN_STATE_COUNT ((uint32_t)(sizeof(struct arm_pagein_state)/sizeof(uint32_t)))
 
 struct arm_sme_state
 {
@@ -2801,34 +2888,31 @@ struct arm_sme_state
     uint64_t tpidr2_el0;
     uint16_t svl_b;
 };
+#define ARM_SME_STATE_COUNT ((uint32_t)(sizeof(struct arm_sme_state)/sizeof(uint32_t)))
 
 struct arm_sve_z_state
 {
     uint8_t z[16][256];
 } CC_align(4);
+#define ARM_SVE_Z_STATE_COUNT ((uint32_t)(sizeof(struct arm_sve_z_state)/sizeof(uint32_t)))
 
 struct arm_sve_p_state
 {
     uint8_t p[16][256 / 8];
 } CC_align(4);
+#define ARM_SVE_P_STATE_COUNT ((uint32_t)(sizeof(struct arm_sve_p_state)/sizeof(uint32_t)))
 
 struct arm_sme_za_state
 {
     uint8_t za[4096];
 } CC_align(4);
+#define ARM_SME_ZA_STATE_COUNT ((uint32_t)(sizeof(struct arm_sme_za_state)/sizeof(uint32_t)))
 
 struct arm_sme2_state
 {
     uint8_t zt0[64];
 } CC_align(4);
-
-struct arm_debug_state
-{
-    uint32_t bvr[16];
-    uint32_t bcr[16];
-    uint32_t wvr[16];
-    uint32_t wcr[16];
-};
+#define ARM_SME2_STATE_COUNT ((uint32_t)(sizeof(struct arm_sme2_state)/sizeof(uint32_t)))
 
 struct arm_legacy_debug_state
 {
@@ -2837,6 +2921,7 @@ struct arm_legacy_debug_state
     uint32_t wvr[16];
     uint32_t wcr[16];
 };
+#define ARM_LEGACY_DEBUG_STATE_COUNT ((uint32_t)(sizeof(struct arm_legacy_debug_state)/sizeof(uint32_t)))
 
 struct arm_debug_state32
 {
@@ -2846,6 +2931,7 @@ struct arm_debug_state32
     uint32_t wcr[16];
     uint64_t mdscr_el1; /* Bit 0 is SS (Hardware Single Step) */
 };
+#define ARM_DEBUG_STATE32_COUNT ((uint32_t)(sizeof(struct arm_debug_state32)/sizeof(uint32_t)))
 
 struct arm_debug_state64
 {
@@ -2855,8 +2941,95 @@ struct arm_debug_state64
     uint64_t wcr[16];
     uint64_t mdscr_el1; /* Bit 0 is SS (Hardware Single Step) */
 };
+#define ARM_DEBUG_STATE64_COUNT ((uint32_t)(sizeof(struct arm_debug_state64)/sizeof(uint32_t)))
 
 struct arm_cpmu_state64
 {
     uint64_t ctrs[16];
+};
+#define ARM_CPMU_STATE64_COUNT ((uint32_t)(sizeof(struct arm_cpmu_state64)/sizeof(uint32_t)))
+
+struct arm_sme_context {
+    uint8_t zt0[64];
+    uint8_t z_p_za[];
+};
+
+struct arm_sme_saved_state {
+	uint32_t               flavor;
+	uint32_t               count;
+	uint64_t               svcr;
+	uint16_t               svl_b;
+	struct arm_sme_context context;
+};
+#define ARM_SME_Z_SIZE(svl_b) (((size_t)svl_b)<<5)
+#define ARM_SME_P_SIZE(svl_b) (((size_t)svl_b)<<1)
+#define ARM_SME_ZA_SIZE(svl_b) (((size_t)svl_b)*((size_t)svl_b))
+#define ARM_SME_SAVED_STATE_COUNT(svl_b) ((uint32_t)(\
+    (sizeof(struct arm_sme_saved_state) \
+    + ARM_SME_Z_SIZE(svl_b) \
+    + ARM_SME_P_SIZE(svl_b) \
+    + ARM_SME_ZA_SIZE(svl_b)) / sizeof(uint32_t)))
+static inline size_t arm_sme_z_size(uint16_t svl_b)
+{
+	return ((size_t)svl_b) << 5;
+}
+static inline size_t arm_sme_p_size(uint16_t svl_b)
+{
+	return ((size_t)svl_b) << 1;
+}
+static inline size_t arm_sme_za_size(uint16_t svl_b)
+{
+	return ((size_t)svl_b) * ((size_t)svl_b);
+}
+static inline uint32_t arm_sme_saved_state_count(uint16_t svl_b)
+{
+	// assert(svl_b % 16 == 0);
+	size_t size = sizeof(struct arm_sme_saved_state) +
+	    arm_sme_z_size(svl_b) +
+	    arm_sme_p_size(svl_b) +
+	    arm_sme_za_size(svl_b);
+	return (uint32_t)(size / sizeof(uint32_t));
+}
+
+/* Combine all thread states */
+union thread_state {
+    union {
+        struct arm_thread_state32 thread_32;
+        struct arm_thread_state64 thread_64;
+        struct arm_vfp_state vfp;
+        struct arm_exception_state32 exception_32;
+        struct arm_exception_state64 exception_64;
+        struct arm_exception_state64_v2 exception_v2_64;
+        struct arm_legacy_debug_state debug_legacy;
+        struct arm_debug_state32 debug_32;
+        struct arm_debug_state64 debug_64;
+        struct arm_neon_state64 neon_64;
+        struct arm_pagein_state pagein;
+        struct arm_sme_state sme;
+        struct arm_sme2_state sme2;
+        struct arm_sve_z_state sve_z;
+        struct arm_sve_p_state sve_p;
+        struct arm_sme_za_state sme_za;
+        struct arm_cpmu_state64 cpmu_64;
+    } arm;
+    union {
+        struct x86_thread_state32 thread_32;
+        struct x86_thread_state64 thread_64;
+        struct x86_thread_full_state64 thread_full64;
+        struct x86_float_state32 float_32;
+        struct x86_float_state64 float_64;
+        struct x86_avx_state32 avx_32;
+        struct x86_avx_state64 avx_64;
+        struct x86_avx512_state32 avx512_32;
+        struct x86_avx512_state64 avx512_64;
+        struct x86_exception_state32 exception_32;
+        struct x86_exception_state64 exception_64;
+        struct x86_debug_state32 debug_32;
+        struct x86_debug_state64 debug_64;
+        struct x86_cpmu_state64 cpmu_64;
+        struct x86_last_branch_state last_branch;
+        struct x86_pagein_state pagein;
+        struct x86_saved_state32 saved_32;
+        struct x86_saved_state64 saved_64;
+    } x86;
 };

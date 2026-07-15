@@ -415,7 +415,7 @@ static const_info_t load_commands_s[54] = {
 };
 
 /* x86 Thread Flavors (used in LC_MAIN and LC_UNIXTHREAD commands) */
-static const_info_t x86_thread_flavors_s[23] = {
+static const_info_t x86_thread_flavors_s[25] = {
     entry(x86_THREAD_STATE32,      NULL),
     entry(x86_FLOAT_STATE32,       NULL),
     entry(x86_EXCEPTION_STATE32,   NULL),
@@ -429,6 +429,8 @@ static const_info_t x86_thread_flavors_s[23] = {
     entry(x86_DEBUG_STATE64,       NULL),
     entry(x86_DEBUG_STATE,         NULL),
     entry(x86_THREAD_STATE_NONE,   NULL),
+    entry(x86_SAVED_STATE32,       NULL),
+    entry(x86_SAVED_STATE64,       NULL),
     entry(x86_AVX_STATE32,         NULL),
     entry(x86_AVX_STATE64,         NULL),
     entry(x86_AVX_STATE,           NULL),
@@ -439,6 +441,146 @@ static const_info_t x86_thread_flavors_s[23] = {
     entry(x86_THREAD_FULL_STATE64, NULL),
     entry(x86_INSTRUCTION_STATE,   NULL),
     entry(x86_LAST_BRANCH_STATE,   NULL)
+};
+/* Maps state flavor to number of words in the state */
+uint32_t x86_thread_state_size_s[x86_THREAD_STATE_FLAVORS] = {
+	[0]                             = 0,
+	[x86_THREAD_STATE32]            = x86_THREAD_STATE32_COUNT,
+	[x86_FLOAT_STATE32]             = x86_FLOAT_STATE32_COUNT,
+	[x86_EXCEPTION_STATE32]         = x86_EXCEPTION_STATE32_COUNT,
+	[x86_THREAD_STATE64]            = x86_THREAD_STATE64_COUNT,
+	[x86_FLOAT_STATE64]             = x86_FLOAT_STATE64_COUNT,
+	[x86_EXCEPTION_STATE64]         = x86_EXCEPTION_STATE64_COUNT,
+	[x86_THREAD_STATE]              = x86_THREAD_STATE32_COUNT,
+	[x86_FLOAT_STATE]               = x86_FLOAT_STATE32_COUNT,
+	[x86_EXCEPTION_STATE]           = x86_EXCEPTION_STATE32_COUNT,
+	[x86_DEBUG_STATE32]             = x86_DEBUG_STATE32_COUNT,
+	[x86_DEBUG_STATE64]             = x86_DEBUG_STATE64_COUNT,
+	[x86_DEBUG_STATE]               = x86_DEBUG_STATE32_COUNT,
+    [x86_THREAD_STATE_NONE]         = 0,
+	[x86_SAVED_STATE32]             = x86_SAVED_STATE32_COUNT,
+	[x86_SAVED_STATE64]             = x86_SAVED_STATE64_COUNT,
+	[x86_AVX_STATE32]               = x86_AVX_STATE32_COUNT,
+	[x86_AVX_STATE64]               = x86_AVX_STATE64_COUNT,
+	[x86_AVX_STATE]                 = x86_AVX_STATE32_COUNT,
+	[x86_AVX512_STATE32]            = x86_AVX512_STATE32_COUNT,
+	[x86_AVX512_STATE64]            = x86_AVX512_STATE64_COUNT,
+	[x86_AVX512_STATE]              = x86_AVX512_STATE32_COUNT,
+	[x86_PAGEIN_STATE]              = x86_PAGEIN_STATE_COUNT,
+	[x86_THREAD_FULL_STATE64]       = x86_THREAD_FULL_STATE64_COUNT,
+	[x86_INSTRUCTION_STATE]         = x86_INSTRUCTION_STATE_COUNT,
+	[x86_LAST_BRANCH_STATE]         = x86_LAST_BRANCH_STATE_COUNT
+};
+
+/* ARM Thread Flavors (used in LC_MAIN and LC_UNIXTHREAD commands) */
+static const_info_t arm_thread_flavors_s[43] = {
+    entry(ARM_UNIFIED_THREAD_STATE, "alias to ARM_THREAD_STATE"),
+    entry(ARM_THREAD_STATE,         NULL),
+    entry(ARM_VFP_STATE,            NULL),
+    entry(ARM_EXCEPTION_STATE,      NULL),
+    entry(ARM_DEBUG_STATE,          NULL),
+    entry(ARM_THREAD_STATE_NONE,    NULL),
+    entry(ARM_THREAD_STATE64,       NULL),
+    entry(ARM_EXCEPTION_STATE64,    NULL),
+    entry(ARM_THREAD_STATE_LAST,    "legacy (no longer supported)"),
+    entry(ARM_THREAD_STATE32,       NULL),
+    entry(ARM_EXCEPTION_STATE64_V2, NULL),
+    entry(ARM_DEBUG_STATE32,        NULL),
+    entry(ARM_DEBUG_STATE64,        NULL),
+    entry(ARM_NEON_STATE,           NULL),
+    entry(ARM_NEON_STATE64,         NULL),
+    entry(ARM_CPMU_STATE64,         NULL),
+    /* For kernel use */
+    entry(ARM_SAVED_STATE32,        NULL),
+    entry(ARM_SAVED_STATE64,        NULL),
+    entry(ARM_NEON_SAVED_STATE32,   NULL),
+    entry(ARM_NEON_SAVED_STATE64,   NULL),
+    entry(ARM_PAGEIN_STATE,         NULL),
+    /* API */
+    entry(ARM_SME_STATE,            NULL),
+    entry(ARM_SVE_Z_STATE1,         NULL),
+    entry(ARM_SVE_Z_STATE2,         NULL),
+    entry(ARM_SVE_P_STATE,          NULL),
+    entry(ARM_SME_ZA_STATE1,        NULL),
+    entry(ARM_SME_ZA_STATE2,        NULL),
+    entry(ARM_SME_ZA_STATE3,        NULL),
+    entry(ARM_SME_ZA_STATE4,        NULL),
+    entry(ARM_SME_ZA_STATE5,        NULL),
+    entry(ARM_SME_ZA_STATE6,        NULL),
+    entry(ARM_SME_ZA_STATE7,        NULL),
+    entry(ARM_SME_ZA_STATE8,        NULL),
+    entry(ARM_SME_ZA_STATE9,        NULL),
+    entry(ARM_SME_ZA_STATE10,       NULL),
+    entry(ARM_SME_ZA_STATE11,       NULL),
+    entry(ARM_SME_ZA_STATE12,       NULL),
+    entry(ARM_SME_ZA_STATE13,       NULL),
+    entry(ARM_SME_ZA_STATE14,       NULL),
+    entry(ARM_SME_ZA_STATE15,       NULL),
+    entry(ARM_SME_ZA_STATE16,       NULL),
+    entry(ARM_SME2_STATE,           NULL),
+    entry(ARM_SME_SAVED_STATE,      NULL)
+};
+/* Maps state flavor to number of words in the state
+ * reference:
+ * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/arm64/status.c#L65-L89 */
+uint32_t arm_thread_state_size_s[ARM_THREAD_STATE_FLAVORS] = {
+	[0]                             = 0,
+	[ARM_UNIFIED_THREAD_STATE]      = ARM_THREAD_STATE,
+	[ARM_VFP_STATE]                 = ARM_VFP_STATE_COUNT,
+	[ARM_EXCEPTION_STATE]           = ARM_EXCEPTION_STATE32_COUNT,
+	[ARM_DEBUG_STATE]               = ARM_DEBUG_STATE32_COUNT,
+	[ARM_THREAD_STATE_NONE]         = 0,
+	[ARM_THREAD_STATE64]            = ARM_THREAD_STATE64_COUNT,
+	[ARM_EXCEPTION_STATE64]         = ARM_EXCEPTION_STATE64_COUNT,
+	[ARM_THREAD_STATE_LAST]         = 0,
+	[ARM_THREAD_STATE32]            = ARM_THREAD_STATE32_COUNT,
+	[ARM_EXCEPTION_STATE64_V2]      = ARM_EXCEPTION_STATE64_V2_COUNT,
+	[11]                            = 0,
+	[12]                            = 0,
+	[13]                            = 0,
+    /* API */
+	[ARM_DEBUG_STATE32]             = ARM_DEBUG_STATE32_COUNT,
+	[ARM_DEBUG_STATE64]             = ARM_DEBUG_STATE64_COUNT,
+	[ARM_NEON_STATE]                = ARM_NEON_STATE64_COUNT,
+	[ARM_NEON_STATE64]              = ARM_NEON_STATE64_COUNT,
+	[ARM_CPMU_STATE64]              = ARM_CPMU_STATE64_COUNT,
+	[19]                            = 0,
+    /* For kernel use */
+	[ARM_SAVED_STATE32]             = 0,
+	[ARM_SAVED_STATE64]             = 0,
+	[ARM_NEON_SAVED_STATE32]        = 0,
+	[ARM_NEON_SAVED_STATE64]        = 0,
+	[24]                            = 0,
+	[25]                            = 0,
+	[26]                            = 0,
+	[ARM_PAGEIN_STATE]              = ARM_PAGEIN_STATE_COUNT,
+    /*
+	 * Mach exception ports don't currently support SME state flavors.
+	 * In case exception_deliver tries to access them anyway, give
+	 * them bogus sizes that will ensure the access fails.
+	 */
+	[ARM_SME_STATE]               = 0,
+	[ARM_SVE_Z_STATE1]            = 0,
+	[ARM_SVE_Z_STATE2]            = 0,
+	[ARM_SVE_P_STATE]             = 0,
+	[ARM_SME_ZA_STATE1]           = 0,
+	[ARM_SME_ZA_STATE2]           = 0,
+	[ARM_SME_ZA_STATE3]           = 0,
+	[ARM_SME_ZA_STATE4]           = 0,
+	[ARM_SME_ZA_STATE5]           = 0,
+	[ARM_SME_ZA_STATE6]           = 0,
+	[ARM_SME_ZA_STATE7]           = 0,
+	[ARM_SME_ZA_STATE8]           = 0,
+	[ARM_SME_ZA_STATE9]           = 0,
+	[ARM_SME_ZA_STATE10]          = 0,
+	[ARM_SME_ZA_STATE11]          = 0,
+	[ARM_SME_ZA_STATE12]          = 0,
+	[ARM_SME_ZA_STATE13]          = 0,
+	[ARM_SME_ZA_STATE14]          = 0,
+	[ARM_SME_ZA_STATE15]          = 0,
+	[ARM_SME_ZA_STATE16]          = 0,
+	[ARM_SME2_STATE]              = 0,
+	[ARM_SME_SAVED_STATE]         = 0,
 };
 // all `const_info_t` were defined, no longer need this macro
 #undef entry
@@ -956,7 +1098,7 @@ int parser_init(mach_decoded_t *p, bytes_t src, size_t len)
             p->header.reserved = 0;
             break;
         default:
-            printf("invalid magic: %"PRIx32"\n", p->header.magic);
+            printf("unknown magic: %"PRIx32"\n", p->header.magic);
             fflush(stdout);
             return -1;
             break;
@@ -1400,20 +1542,289 @@ char *dylinker_command2hex0(char *out, const struct dylinker_command *cmd)
     return out;
 }
 
-// /* Encode LC_UNIXTHREAD commands to Hex0 */
-// char *unixthread_command2hex0(char *out, const struct mach_header *header, const struct unixthread_command *cmd)
-// {
-//     bytes_t ptr, end;
-//     size_t len = cmd->cmdsize - cmd->name;
-//     ptr = ((bytes_t)cmd) + cmd->name;
-//     end = ((bytes_t)cmd) + cmd->cmdsize;
-//     /* encode command fields */
-//     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-//     out = field_int2hex0(out, "name offset: ", (bytes_t)&cmd->name, 4);
-//     if (ptr >= (((bytes_t)cmd) + sizeof(struct dylinker_command)) && (ptr+len) <= end)
-//         out = field_str2hex0(out, "name: ", ptr, len);
-//     return out;
-// }
+/* Encode LC_UNIXTHREAD commands to Hex0 */
+char *unixthread_command2hex0(char *out, const struct mach_header *header, const struct unixthread_command *cmd)
+{
+    union thread_state *ts;
+    uint32_t flavor_fmt;
+    const char *flavor;
+    bytes_t ptr, end;
+    size_t len, rem, count;
+    ptr = ((bytes_t)cmd);
+    end = ((bytes_t)cmd) + cmd->cmdsize;
+    rem = cmd->cmdsize;
+
+    /* encode command fields */
+    len = (size_t)min((uintmax_t)rem, (uintmax_t)sizeof(struct load_command));
+    out = load_command_common2hex0(out, (const struct load_command*)cmd);
+    if ((rem = rem - len) == 0) return out;
+    ptr += len;
+
+    /* thread flavor */
+    count = 0;
+    switch (header->cputype)
+    {
+    case CPU_TYPE_X86:
+    case CPU_TYPE_X86_64:
+        switch (cmd->flavor)
+        {
+        case x86_THREAD_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_X86 ? x86_THREAD_STATE32 : x86_THREAD_STATE64;
+            break;
+        case x86_FLOAT_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_X86 ? x86_FLOAT_STATE32 : x86_FLOAT_STATE64;
+            break;
+        case x86_AVX_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_X86 ? x86_AVX_STATE32 : x86_AVX_STATE64;
+            break;
+        case x86_AVX512_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_X86 ? x86_AVX512_STATE32 : x86_AVX512_STATE64;
+            break;
+        case x86_DEBUG_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_X86 ? x86_DEBUG_STATE32 : x86_DEBUG_STATE64;
+            break;
+        case x86_EXCEPTION_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_X86 ? x86_EXCEPTION_STATE32 : x86_EXCEPTION_STATE64;
+            break;
+        default:
+            flavor_fmt = cmd->flavor;
+            break;
+        }
+        flavor = get_entry_name_or_default(
+            x86_thread_flavors_s,
+            (sizeof(x86_thread_flavors_s) / sizeof(x86_thread_flavors_s[0])),
+            cmd->flavor);
+        if (flavor_fmt < (uint32_t)(sizeof(x86_thread_state_size_s) / sizeof(x86_thread_state_size_s[0])))
+            count = x86_thread_state_size_s[(size_t)flavor_fmt];
+        break;
+    case CPU_TYPE_ARM:
+    case CPU_TYPE_ARM64:
+    case CPU_TYPE_ARM64_32:
+        switch (cmd->flavor)
+        {
+        case ARM_THREAD_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_ARM ? ARM_THREAD_STATE32 : ARM_THREAD_STATE64;
+            break;
+        case ARM_DEBUG_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_ARM ? ARM_DEBUG_STATE32 : ARM_DEBUG_STATE64;
+            break;
+        case ARM_EXCEPTION_STATE:
+            flavor_fmt = header->cputype == CPU_TYPE_ARM ? ARM_EXCEPTION_STATE : ARM_EXCEPTION_STATE64_V2;
+            break;
+        default:
+            flavor_fmt = cmd->flavor;
+            break;
+        }
+        flavor = get_entry_name_or_default(
+            arm_thread_flavors_s,
+            (sizeof(arm_thread_flavors_s) / sizeof(arm_thread_flavors_s[0])),
+            cmd->flavor);
+        if (flavor_fmt < (uint32_t)(sizeof(arm_thread_state_size_s) / sizeof(arm_thread_state_size_s[0])))
+            count = arm_thread_state_size_s[(size_t)flavor_fmt];
+        break;
+    default:
+        flavor = "<UNKNOWN>";
+        break;
+    }
+    len = (size_t)min((uintmax_t)rem, (uintmax_t)sizeof(cmd->flavor));
+    out = field_val2hex0(out, "thread flavor: ", flavor, (bytes_t)&cmd->flavor, len);
+    if ((rem = rem - len) == 0) return out;
+    ptr += len;
+
+    /* thread state size (in 4-byte words) */
+    len = (size_t)min((uintmax_t)rem, (uintmax_t)sizeof(cmd->count));
+    out = field_int2hex0(out, "thread state size: ", (bytes_t)&cmd->count, len);
+    if ((rem = rem - len) == 0) return out;
+    ptr += len;
+
+    /* Check if the thread state size matches the command size.
+     * (unixthread_command->count * sizeof(uint32_t)) == (unixthread_command->cmdsize - 16) */
+    len = (size_t)min((uintmax_t)rem, (uintmax_t)(cmd->count * sizeof(uint32_t)));
+    if (count == 0 || len != (cmd->count * sizeof(uint32_t)))
+        return fmt_row(out, "<INVALID UNIXTHREAD STATE>", ptr, rem);
+    if (((uint32_t)count) != cmd->count)
+        return fmt_row(out, "<INVALID UNIXTHREAD COUNT>", ptr, rem);
+
+    /* thread state */
+    ts = (union thread_state *)ptr;
+    if (header->cputype == CPU_TYPE_X86 || header->cputype == CPU_TYPE_X86_64)
+    {
+        switch (flavor_fmt) {
+        case x86_THREAD_STATE32:
+            out = field_int2hex0(out, "eax: ", (bytes_t)&ts->x86.thread_32.eax, 4);
+            out = field_int2hex0(out, "ebx: ", (bytes_t)&ts->x86.thread_32.ebx, 4);
+            out = field_int2hex0(out, "ecx: ", (bytes_t)&ts->x86.thread_32.ecx, 4);
+            out = field_int2hex0(out, "edx: ", (bytes_t)&ts->x86.thread_32.edx, 4);
+            out = field_int2hex0(out, "edi: ", (bytes_t)&ts->x86.thread_32.edi, 4);
+            out = field_int2hex0(out, "esi: ", (bytes_t)&ts->x86.thread_32.esi, 4);
+            out = field_int2hex0(out, "ebp: ", (bytes_t)&ts->x86.thread_32.ebp, 4);
+            out = field_int2hex0(out, "esp: ", (bytes_t)&ts->x86.thread_32.esp, 4);
+            out = field_int2hex0(out, "ss: ", (bytes_t)&ts->x86.thread_32.ss, 4);
+            out = field_int2hex0(out, "eflags: ", (bytes_t)&ts->x86.thread_32.eflags, 4);
+            out = field_int2hex0(out, "eip: ", (bytes_t)&ts->x86.thread_32.eip, 4);
+            out = field_int2hex0(out, "cs: ", (bytes_t)&ts->x86.thread_32.cs, 4);
+            out = field_int2hex0(out, "ds: ", (bytes_t)&ts->x86.thread_32.ds, 4);
+            out = field_int2hex0(out, "es: ", (bytes_t)&ts->x86.thread_32.es, 4);
+            out = field_int2hex0(out, "fs: ", (bytes_t)&ts->x86.thread_32.fs, 4);
+            out = field_int2hex0(out, "gs: ", (bytes_t)&ts->x86.thread_32.gs, 4);
+            break;
+        case x86_THREAD_STATE64:
+            out = field_int2hex0(out, "rax: ", (bytes_t)&ts->x86.thread_64.rax, 8);
+            out = field_int2hex0(out, "rbx: ", (bytes_t)&ts->x86.thread_64.rbx, 8);
+            out = field_int2hex0(out, "rcx: ", (bytes_t)&ts->x86.thread_64.rcx, 8);
+            out = field_int2hex0(out, "rdx: ", (bytes_t)&ts->x86.thread_64.rdx, 8);
+            out = field_int2hex0(out, "rdi: ", (bytes_t)&ts->x86.thread_64.rdi, 8);
+            out = field_int2hex0(out, "rsi: ", (bytes_t)&ts->x86.thread_64.rsi, 8);
+            out = field_int2hex0(out, "rbp: ", (bytes_t)&ts->x86.thread_64.rbp, 8);
+            out = field_int2hex0(out, "rsp: ", (bytes_t)&ts->x86.thread_64.rsp, 8);
+            out = field_int2hex0(out, "r8: ", (bytes_t)&ts->x86.thread_64.r8, 8);
+            out = field_int2hex0(out, "r9: ", (bytes_t)&ts->x86.thread_64.r9, 8);
+            out = field_int2hex0(out, "r10: ", (bytes_t)&ts->x86.thread_64.r10, 8);
+            out = field_int2hex0(out, "r11: ", (bytes_t)&ts->x86.thread_64.r11, 8);
+            out = field_int2hex0(out, "r12: ", (bytes_t)&ts->x86.thread_64.r12, 8);
+            out = field_int2hex0(out, "r13: ", (bytes_t)&ts->x86.thread_64.r13, 8);
+            out = field_int2hex0(out, "r14: ", (bytes_t)&ts->x86.thread_64.r14, 8);
+            out = field_int2hex0(out, "r15: ", (bytes_t)&ts->x86.thread_64.r15, 8);
+            out = field_int2hex0(out, "rip: ", (bytes_t)&ts->x86.thread_64.rip, 8);
+            out = field_int2hex0(out, "rflags: ", (bytes_t)&ts->x86.thread_64.rflags, 8);
+            out = field_int2hex0(out, "cs: ", (bytes_t)&ts->x86.thread_64.cs, 8);
+            out = field_int2hex0(out, "fs: ", (bytes_t)&ts->x86.thread_64.fs, 8);
+            out = field_int2hex0(out, "gs: ", (bytes_t)&ts->x86.thread_64.gs, 8);
+            break;
+        case x86_FLOAT_STATE32:
+        case x86_EXCEPTION_STATE32:
+        case x86_FLOAT_STATE64:
+        case x86_EXCEPTION_STATE64:
+        case x86_THREAD_STATE:
+        case x86_FLOAT_STATE:
+        case x86_EXCEPTION_STATE:
+        case x86_DEBUG_STATE32:
+        case x86_DEBUG_STATE64:
+        case x86_DEBUG_STATE:
+        case x86_SAVED_STATE32:
+        case x86_SAVED_STATE64:
+        case x86_AVX_STATE32:
+        case x86_AVX_STATE64:
+        case x86_AVX_STATE:
+        case x86_AVX512_STATE32:
+        case x86_AVX512_STATE64:
+        case x86_AVX512_STATE:
+        case x86_PAGEIN_STATE:
+        case x86_THREAD_FULL_STATE64:
+        case x86_INSTRUCTION_STATE:
+        case x86_LAST_BRANCH_STATE:
+            return fmt_row(out, "<NOT IMPLEMENTED>", ptr, rem);
+        default:
+            return fmt_row(out, "<UNKNOWN THREAD STATE>", ptr, rem);
+        }
+    } else if (header->cputype == CPU_TYPE_ARM
+        || header->cputype == CPU_TYPE_ARM64
+        || header->cputype == CPU_TYPE_ARM64_32) {
+        switch (flavor_fmt) {
+        case ARM_THREAD_STATE32:
+            out = field_int2hex0(out, "r0: ", (bytes_t)&ts->arm.thread_32.r[0], 4);
+            out = field_int2hex0(out, "r1: ", (bytes_t)&ts->arm.thread_32.r[1], 4);
+            out = field_int2hex0(out, "r2: ", (bytes_t)&ts->arm.thread_32.r[2], 4);
+            out = field_int2hex0(out, "r3: ", (bytes_t)&ts->arm.thread_32.r[3], 4);
+            out = field_int2hex0(out, "r4: ", (bytes_t)&ts->arm.thread_32.r[4], 4);
+            out = field_int2hex0(out, "r5: ", (bytes_t)&ts->arm.thread_32.r[5], 4);
+            out = field_int2hex0(out, "r6: ", (bytes_t)&ts->arm.thread_32.r[6], 4);
+            out = field_int2hex0(out, "r7: ", (bytes_t)&ts->arm.thread_32.r[7], 4);
+            out = field_int2hex0(out, "r8: ", (bytes_t)&ts->arm.thread_32.r[8], 4);
+            out = field_int2hex0(out, "r9: ", (bytes_t)&ts->arm.thread_32.r[9], 4);
+            out = field_int2hex0(out, "r10: ", (bytes_t)&ts->arm.thread_32.r[10], 4);
+            out = field_int2hex0(out, "r11: ", (bytes_t)&ts->arm.thread_32.r[11], 4);
+            out = field_int2hex0(out, "r12: ", (bytes_t)&ts->arm.thread_32.r[12], 4);
+            out = field_int2hex0(out, "sp: ", (bytes_t)&ts->arm.thread_32.sp, 4);
+            out = field_int2hex0(out, "lr: ", (bytes_t)&ts->arm.thread_32.lr, 4);
+            out = field_int2hex0(out, "pc: ", (bytes_t)&ts->arm.thread_32.pc, 4);
+            out = field_int2hex0(out, "cpsr: ", (bytes_t)&ts->arm.thread_32.cpsr, 4);
+            break;
+        case ARM_THREAD_STATE64:
+            out = field_int2hex0(out, "x0: ", (bytes_t)&ts->arm.thread_64.x[0], 8);
+            out = field_int2hex0(out, "x1: ", (bytes_t)&ts->arm.thread_64.x[1], 8);
+            out = field_int2hex0(out, "x2: ", (bytes_t)&ts->arm.thread_64.x[2], 8);
+            out = field_int2hex0(out, "x3: ", (bytes_t)&ts->arm.thread_64.x[3], 8);
+            out = field_int2hex0(out, "x4: ", (bytes_t)&ts->arm.thread_64.x[4], 8);
+            out = field_int2hex0(out, "x5: ", (bytes_t)&ts->arm.thread_64.x[5], 8);
+            out = field_int2hex0(out, "x6: ", (bytes_t)&ts->arm.thread_64.x[6], 8);
+            out = field_int2hex0(out, "x7: ", (bytes_t)&ts->arm.thread_64.x[7], 8);
+            out = field_int2hex0(out, "x8: ", (bytes_t)&ts->arm.thread_64.x[8], 8);
+            out = field_int2hex0(out, "x9: ", (bytes_t)&ts->arm.thread_64.x[9], 8);
+            out = field_int2hex0(out, "x10: ", (bytes_t)&ts->arm.thread_64.x[10], 8);
+            out = field_int2hex0(out, "x11: ", (bytes_t)&ts->arm.thread_64.x[11], 8);
+            out = field_int2hex0(out, "x12: ", (bytes_t)&ts->arm.thread_64.x[12], 8);
+            out = field_int2hex0(out, "x13: ", (bytes_t)&ts->arm.thread_64.x[13], 8);
+            out = field_int2hex0(out, "x14: ", (bytes_t)&ts->arm.thread_64.x[14], 8);
+            out = field_int2hex0(out, "x15: ", (bytes_t)&ts->arm.thread_64.x[15], 8);
+            out = field_int2hex0(out, "x16: ", (bytes_t)&ts->arm.thread_64.x[16], 8);
+            out = field_int2hex0(out, "x17: ", (bytes_t)&ts->arm.thread_64.x[17], 8);
+            out = field_int2hex0(out, "x17: ", (bytes_t)&ts->arm.thread_64.x[17], 8);
+            out = field_int2hex0(out, "x18: ", (bytes_t)&ts->arm.thread_64.x[18], 8);
+            out = field_int2hex0(out, "x19: ", (bytes_t)&ts->arm.thread_64.x[19], 8);
+            out = field_int2hex0(out, "x20: ", (bytes_t)&ts->arm.thread_64.x[20], 8);
+            out = field_int2hex0(out, "x21: ", (bytes_t)&ts->arm.thread_64.x[21], 8);
+            out = field_int2hex0(out, "x22: ", (bytes_t)&ts->arm.thread_64.x[22], 8);
+            out = field_int2hex0(out, "x23: ", (bytes_t)&ts->arm.thread_64.x[23], 8);
+            out = field_int2hex0(out, "x24: ", (bytes_t)&ts->arm.thread_64.x[24], 8);
+            out = field_int2hex0(out, "x25: ", (bytes_t)&ts->arm.thread_64.x[25], 8);
+            out = field_int2hex0(out, "x26: ", (bytes_t)&ts->arm.thread_64.x[26], 8);
+            out = field_int2hex0(out, "x27: ", (bytes_t)&ts->arm.thread_64.x[27], 8);
+            out = field_int2hex0(out, "x27: ", (bytes_t)&ts->arm.thread_64.x[27], 8);
+            out = field_int2hex0(out, "x28: ", (bytes_t)&ts->arm.thread_64.x[28], 8);
+            out = field_int2hex0(out, "sp: ", (bytes_t)&ts->arm.thread_64.sp, 8);
+            out = field_int2hex0(out, "lr: ", (bytes_t)&ts->arm.thread_64.lr, 8);
+            out = field_int2hex0(out, "pc: ", (bytes_t)&ts->arm.thread_64.pc, 8);
+            out = field_int2hex0(out, "cpsr: ", (bytes_t)&ts->arm.thread_64.cpsr, 4);
+            out = field_int2hex0(out, "flags: ", (bytes_t)&ts->arm.thread_64.flags, 4);
+            break;
+            case ARM_THREAD_STATE:
+            case ARM_VFP_STATE:
+            case ARM_EXCEPTION_STATE:
+            case ARM_DEBUG_STATE:
+            case ARM_THREAD_STATE_NONE:
+            case ARM_EXCEPTION_STATE64:
+            case ARM_THREAD_STATE_LAST:
+            case ARM_EXCEPTION_STATE64_V2:
+            case ARM_DEBUG_STATE32:
+            case ARM_DEBUG_STATE64:
+            case ARM_NEON_STATE:
+            case ARM_NEON_STATE64:
+            case ARM_CPMU_STATE64:
+            case ARM_SAVED_STATE32:
+            case ARM_SAVED_STATE64:
+            case ARM_NEON_SAVED_STATE32:
+            case ARM_NEON_SAVED_STATE64:
+            case ARM_PAGEIN_STATE:
+            case ARM_SME_STATE:
+            case ARM_SVE_Z_STATE1:
+            case ARM_SVE_Z_STATE2:
+            case ARM_SVE_P_STATE:
+            case ARM_SME_ZA_STATE1:
+            case ARM_SME_ZA_STATE2:
+            case ARM_SME_ZA_STATE3:
+            case ARM_SME_ZA_STATE4:
+            case ARM_SME_ZA_STATE5:
+            case ARM_SME_ZA_STATE6:
+            case ARM_SME_ZA_STATE7:
+            case ARM_SME_ZA_STATE8:
+            case ARM_SME_ZA_STATE9:
+            case ARM_SME_ZA_STATE10:
+            case ARM_SME_ZA_STATE11:
+            case ARM_SME_ZA_STATE12:
+            case ARM_SME_ZA_STATE13:
+            case ARM_SME_ZA_STATE14:
+            case ARM_SME_ZA_STATE15:
+            case ARM_SME_ZA_STATE16:
+            case ARM_SME2_STATE:
+            case ARM_SME_SAVED_STATE:
+            return fmt_row(out, "<NOT IMPLEMENTED>", ptr, rem);
+        default:
+            return fmt_row(out, "<UNKNOWN THREAD STATE>", ptr, rem);
+        }
+    }
+    return out;
+}
 
 /* Encode Load Command to Hex0  */
 char *load_command2hex0(char *out, const struct mach_header *header, const struct load_command *cmd)
@@ -1454,6 +1865,8 @@ char *load_command2hex0(char *out, const struct mach_header *header, const struc
     case LC_LOAD_DYLINKER:
     case LC_DYLD_ENVIRONMENT:
         return dylinker_command2hex0(out, (const struct dylinker_command*)cmd);
+    case LC_UNIXTHREAD:
+        return unixthread_command2hex0(out, header, (const struct unixthread_command*)cmd);
     default:
         break;
     }
