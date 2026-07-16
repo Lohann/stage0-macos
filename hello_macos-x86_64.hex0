@@ -24,7 +24,7 @@ CFFAEDFE         # MH_MAGIC_64
 5F5F504147455A45 # |- segment name = "__PAGEZERO"
 524F000000000000 # |                 (pad to 16 bytes)
 0000000000000000 # |- vmaddr       = 0
-0000000001000000 # |- vmsize       = 16777216 (4GB)
+0000000001000000 # |- vmsize       = 16777216 (4MB)
 0000000000000000 # |- fileoff      = 0
 0000000000000000 # |- filesize     = 0
 00000000         # |- maxprot      = 0
@@ -37,7 +37,7 @@ CFFAEDFE         # MH_MAGIC_64
 48000000         # |- size         = 72
 5F5F544558540000 # |- segment name = "__TEXT"
 0000000000000000 # |                 (pad to 16 bytes)
-0000000001000000 # |- vmaddr       = 16777216 (4GB)
+0000000001000000 # |- vmaddr       = 16777216 (4MB)
 B501000000000000 # |- vmsize       = 437
 0000000000000000 # |- fileoff      = 0
 B501000000000000 # |- filesize     = 437
