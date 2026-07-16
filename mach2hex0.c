@@ -8,6 +8,7 @@
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/EXTERNAL_HEADERS/mach-o/loader.h#L50-L81
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/machine.h#L127-L482
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/mach_loader.c#L1225-L1996
+ * - https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/MachOTopics/1-Articles/executing_files.html
  * - https://github.com/aidansteele/osx-abi-macho-file-format-reference
  * - https://www.macsyscalls.com/en/syscall
  *
@@ -524,63 +525,63 @@ static const_info_t arm_thread_flavors_s[43] = {
  * reference:
  * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/arm64/status.c#L65-L89 */
 uint32_t arm_thread_state_size_s[ARM_THREAD_STATE_FLAVORS] = {
-	[0]                             = 0,
-	[ARM_UNIFIED_THREAD_STATE]      = ARM_THREAD_STATE,
-	[ARM_VFP_STATE]                 = ARM_VFP_STATE_COUNT,
-	[ARM_EXCEPTION_STATE]           = ARM_EXCEPTION_STATE32_COUNT,
-	[ARM_DEBUG_STATE]               = ARM_DEBUG_STATE32_COUNT,
-	[ARM_THREAD_STATE_NONE]         = 0,
-	[ARM_THREAD_STATE64]            = ARM_THREAD_STATE64_COUNT,
-	[ARM_EXCEPTION_STATE64]         = ARM_EXCEPTION_STATE64_COUNT,
-	[ARM_THREAD_STATE_LAST]         = 0,
-	[ARM_THREAD_STATE32]            = ARM_THREAD_STATE32_COUNT,
-	[ARM_EXCEPTION_STATE64_V2]      = ARM_EXCEPTION_STATE64_V2_COUNT,
-	[11]                            = 0,
-	[12]                            = 0,
-	[13]                            = 0,
+	[0]                        = 0,
+	[ARM_UNIFIED_THREAD_STATE] = ARM_THREAD_STATE,
+	[ARM_VFP_STATE]            = ARM_VFP_STATE_COUNT,
+	[ARM_EXCEPTION_STATE]      = ARM_EXCEPTION_STATE32_COUNT,
+	[ARM_DEBUG_STATE]          = ARM_DEBUG_STATE32_COUNT,
+	[ARM_THREAD_STATE_NONE]    = 0,
+	[ARM_THREAD_STATE64]       = ARM_THREAD_STATE64_COUNT,
+	[ARM_EXCEPTION_STATE64]    = ARM_EXCEPTION_STATE64_COUNT,
+	[ARM_THREAD_STATE_LAST]    = 0,
+	[ARM_THREAD_STATE32]       = ARM_THREAD_STATE32_COUNT,
+	[ARM_EXCEPTION_STATE64_V2] = ARM_EXCEPTION_STATE64_V2_COUNT,
+	[11]                       = 0,
+	[12]                       = 0,
+	[13]                       = 0,
     /* API */
-	[ARM_DEBUG_STATE32]             = ARM_DEBUG_STATE32_COUNT,
-	[ARM_DEBUG_STATE64]             = ARM_DEBUG_STATE64_COUNT,
-	[ARM_NEON_STATE]                = ARM_NEON_STATE64_COUNT,
-	[ARM_NEON_STATE64]              = ARM_NEON_STATE64_COUNT,
-	[ARM_CPMU_STATE64]              = ARM_CPMU_STATE64_COUNT,
-	[19]                            = 0,
+	[ARM_DEBUG_STATE32]        = ARM_DEBUG_STATE32_COUNT,
+	[ARM_DEBUG_STATE64]        = ARM_DEBUG_STATE64_COUNT,
+	[ARM_NEON_STATE]           = ARM_NEON_STATE64_COUNT,
+	[ARM_NEON_STATE64]         = ARM_NEON_STATE64_COUNT,
+	[ARM_CPMU_STATE64]         = ARM_CPMU_STATE64_COUNT,
+	[19]                       = 0,
     /* For kernel use */
-	[ARM_SAVED_STATE32]             = 0,
-	[ARM_SAVED_STATE64]             = 0,
-	[ARM_NEON_SAVED_STATE32]        = 0,
-	[ARM_NEON_SAVED_STATE64]        = 0,
-	[24]                            = 0,
-	[25]                            = 0,
-	[26]                            = 0,
-	[ARM_PAGEIN_STATE]              = ARM_PAGEIN_STATE_COUNT,
+	[ARM_SAVED_STATE32]        = 0,
+	[ARM_SAVED_STATE64]        = 0,
+	[ARM_NEON_SAVED_STATE32]   = 0,
+	[ARM_NEON_SAVED_STATE64]   = 0,
+	[24]                       = 0,
+	[25]                       = 0,
+	[26]                       = 0,
+	[ARM_PAGEIN_STATE]         = ARM_PAGEIN_STATE_COUNT,
     /*
 	 * Mach exception ports don't currently support SME state flavors.
 	 * In case exception_deliver tries to access them anyway, give
 	 * them bogus sizes that will ensure the access fails.
 	 */
-	[ARM_SME_STATE]               = 0,
-	[ARM_SVE_Z_STATE1]            = 0,
-	[ARM_SVE_Z_STATE2]            = 0,
-	[ARM_SVE_P_STATE]             = 0,
-	[ARM_SME_ZA_STATE1]           = 0,
-	[ARM_SME_ZA_STATE2]           = 0,
-	[ARM_SME_ZA_STATE3]           = 0,
-	[ARM_SME_ZA_STATE4]           = 0,
-	[ARM_SME_ZA_STATE5]           = 0,
-	[ARM_SME_ZA_STATE6]           = 0,
-	[ARM_SME_ZA_STATE7]           = 0,
-	[ARM_SME_ZA_STATE8]           = 0,
-	[ARM_SME_ZA_STATE9]           = 0,
-	[ARM_SME_ZA_STATE10]          = 0,
-	[ARM_SME_ZA_STATE11]          = 0,
-	[ARM_SME_ZA_STATE12]          = 0,
-	[ARM_SME_ZA_STATE13]          = 0,
-	[ARM_SME_ZA_STATE14]          = 0,
-	[ARM_SME_ZA_STATE15]          = 0,
-	[ARM_SME_ZA_STATE16]          = 0,
-	[ARM_SME2_STATE]              = 0,
-	[ARM_SME_SAVED_STATE]         = 0,
+	[ARM_SME_STATE]            = 0,
+	[ARM_SVE_Z_STATE1]         = 0,
+	[ARM_SVE_Z_STATE2]         = 0,
+	[ARM_SVE_P_STATE]          = 0,
+	[ARM_SME_ZA_STATE1]        = 0,
+	[ARM_SME_ZA_STATE2]        = 0,
+	[ARM_SME_ZA_STATE3]        = 0,
+	[ARM_SME_ZA_STATE4]        = 0,
+	[ARM_SME_ZA_STATE5]        = 0,
+	[ARM_SME_ZA_STATE6]        = 0,
+	[ARM_SME_ZA_STATE7]        = 0,
+	[ARM_SME_ZA_STATE8]        = 0,
+	[ARM_SME_ZA_STATE9]        = 0,
+	[ARM_SME_ZA_STATE10]       = 0,
+	[ARM_SME_ZA_STATE11]       = 0,
+	[ARM_SME_ZA_STATE12]       = 0,
+	[ARM_SME_ZA_STATE13]       = 0,
+	[ARM_SME_ZA_STATE14]       = 0,
+	[ARM_SME_ZA_STATE15]       = 0,
+	[ARM_SME_ZA_STATE16]       = 0,
+	[ARM_SME2_STATE]           = 0,
+	[ARM_SME_SAVED_STATE]      = 0,
 };
 // all `const_info_t` were defined, no longer need this macro
 #undef entry
@@ -612,7 +613,7 @@ static inline uintmax_t next_power_of_2(uintmax_t v)
     if (sizeof(uintmax_t) > 4) v |= v >> 32;
     if (sizeof(uintmax_t) > 8) v |= v >> 64;
     /* round-down when v == UINTMAX_MAX */
-    v >>= (uintmax_t)(v == UINTMAX_MAX);
+    v >>= (unsigned char)(v == UINTMAX_MAX);
     v += UINTMAX_C(1);
     return v;
 }
@@ -620,12 +621,12 @@ static inline uintmax_t next_power_of_2(uintmax_t v)
 /*
  * Round up to the next multiple of `aligment`
  */
-static inline uintmax_t align(uintmax_t val, uintmax_t alignment)
+static inline uintmax_t align(uintmax_t value, uintmax_t alignment)
 {
     alignment |= (uintmax_t)(alignment == 0);
-    if (alignment < (UINTMAX_MAX - val))
-        val += alignment - 1;
-    return (val / alignment) * alignment;
+    if (alignment < (UINTMAX_MAX - value))
+        value += alignment - 1;
+    return (value / alignment) * alignment;
 }
 
 /*
@@ -940,7 +941,7 @@ char *sanitize_string(const char *src, size_t len, char *out)
 
 
 /* Encodes an integer with `rawlen` bytes to Hex0 */
-char *field_int2hex0(char *out, const char *fieldname, bytes_t raw, int rawlen)
+char *int_field2hex0(char *out, const char *fieldname, bytes_t raw, int rawlen)
 {
     uint64_t val = 0;
     bytes_t ptr = raw + rawlen;
@@ -954,8 +955,8 @@ char *field_int2hex0(char *out, const char *fieldname, bytes_t raw, int rawlen)
     return out;
 }
 
-/* Encode a field with constant value to Hex0 */
-char *field_val2hex0(
+/* Encode a field with literal value to Hex0 */
+char *lit_field2hex0(
     char* CC_restrict out,
     const char* CC_restrict fieldname,
     const char* CC_restrict value,
@@ -967,7 +968,7 @@ char *field_val2hex0(
     out = fmt_row(out, fieldname, bytes, len);
     out = fmt_s(out, value);
     *(out++) = '\n';
-    *(fmt_s(fmt_u(fmt_s((char*)padding, "(pad to "), (uintmax_t)bytelen), " bytes) ")) = 0;
+    *(fmt_s(fmt_u(fmt_s((char*)padding, "(pad to "), (uintmax_t)bytelen), " bytes)")) = 0;
     padding[sizeof(padding)-2] = '\n';
     padding[sizeof(padding)-1] = 0;
     bytes += len;
@@ -989,7 +990,7 @@ char *field_val2hex0(
 }
 
 /* Encodes cstring to Hex0  */
-char *field_str2hex0(char *out, const char *fieldname, bytes_t bytes, size_t bytelen)
+char *str_field2hex0(char *out, const char *fieldname, bytes_t bytes, size_t bytelen)
 {
     size_t len = (size_t)min((uintmax_t)bytelen, UINTMAX_C(8));
     char padding[32];
@@ -1132,7 +1133,6 @@ int parser_init(mach_decoded_t *p, bytes_t src, size_t len)
     return 0;
 }
 
-
 /* Encodes Mach-O Header to Hex0  */
 char *header2hex0(const mach_decoded_t *p, char *out)
 {
@@ -1148,7 +1148,7 @@ char *header2hex0(const mach_decoded_t *p, char *out)
         (sizeof(mach_magics_s) / sizeof(mach_magics_s[0])),
         p->header.magic
     );
-    out = field_val2hex0(out, "magic: ", val, (bytes_t)&p->header.magic, 4);
+    out = lit_field2hex0(out, "magic: ", val, (bytes_t)&p->header.magic, 4);
 
     // -- CPU TYPE --
     val = get_entry_name_or_default(
@@ -1156,7 +1156,7 @@ char *header2hex0(const mach_decoded_t *p, char *out)
         (sizeof(cputypes_s) / sizeof(cputypes_s[0])),
         p->header.cputype
     );
-    out = field_val2hex0(out, "cpu type: ", val, (bytes_t)&p->header.cputype, 4);
+    out = lit_field2hex0(out, "cpu type: ", val, (bytes_t)&p->header.cputype, 4);
     
     // -- CPU SUBTYPE --
     switch (p->header.cputype)
@@ -1263,17 +1263,17 @@ char *header2hex0(const mach_decoded_t *p, char *out)
         val = "<UNKNOWN>";
         break;
     }
-    out = field_val2hex0(out, "cpu subtype: ", val, (bytes_t)&p->header.cpusubtype, 4);
+    out = lit_field2hex0(out, "cpu subtype: ", val, (bytes_t)&p->header.cpusubtype, 4);
 
     // -- FILE TYPE --
     val = get_entry_name_or_default(filetypes_s, (sizeof(filetypes_s) / sizeof(filetypes_s[0])), p->header.filetype);
-    out = field_val2hex0(out, "file type: ", val, (bytes_t)&p->header.filetype, 4);
+    out = lit_field2hex0(out, "file type: ", val, (bytes_t)&p->header.filetype, 4);
 
     // -- NCMDS --
-    out = field_int2hex0(out, "command count: ", (bytes_t)&p->header.ncmds, 4);
+    out = int_field2hex0(out, "command count: ", (bytes_t)&p->header.ncmds, 4);
 
     // -- CMDS SIZE --
-    out = field_int2hex0(out, "size of count: ", (bytes_t)&p->header.sizeofcmds, 4);
+    out = int_field2hex0(out, "size of count: ", (bytes_t)&p->header.sizeofcmds, 4);
     out = fmt_s(--out, " bytes\n");
 
     // -- FLAGS --
@@ -1294,7 +1294,7 @@ char *header2hex0(const mach_decoded_t *p, char *out)
     {
         case MH_MAGIC_64:
         case MH_CIGAM_64:
-            out = field_int2hex0(out, "reserved: ", (bytes_t)&p->header.reserved, 4);
+            out = int_field2hex0(out, "reserved: ", (bytes_t)&p->header.reserved, 4);
             break;
         default:
             break;
@@ -1310,8 +1310,8 @@ char *load_command_common2hex0(char *out, const struct load_command *cmd)
         (sizeof(load_commands_s) / sizeof(load_commands_s[0])),
         cmd->cmd
     );
-    out = field_val2hex0(out, "command name: ", cmdname, (bytes_t)&cmd->cmd, 4);
-    out = field_int2hex0(out, "command size: ", (bytes_t)&cmd->cmdsize, 4);
+    out = lit_field2hex0(out, "command name: ", cmdname, (bytes_t)&cmd->cmd, 4);
+    out = int_field2hex0(out, "command size: ", (bytes_t)&cmd->cmdsize, 4);
     return out;
 }
 
@@ -1321,15 +1321,15 @@ char *segment_command2hex0(char *out, const struct segment_command_64 *cmd)
     ssize_t cmdsize, len;
     const struct section_64 *section;
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_str2hex0(out, "segment name: ", (bytes_t)cmd->segname, 16);
-    out = field_int2hex0(out, "vm address: ", (bytes_t)&cmd->vmaddr, 8);
-    out = field_int2hex0(out, "vm size: ", (bytes_t)&cmd->vmsize, 8);
-    out = field_int2hex0(out, "file offset: ", (bytes_t)&cmd->fileoff, 8);
-    out = field_int2hex0(out, "file size: ", (bytes_t)&cmd->filesize, 8);
-    out = field_int2hex0(out, "maxprot: ", (bytes_t)&cmd->maxprot, 4);
-    out = field_int2hex0(out, "initprot: ", (bytes_t)&cmd->initprot, 4);
-    out = field_int2hex0(out, "nsects: ", (bytes_t)&cmd->nsects, 4);
-    out = field_int2hex0(out, "flags: ", (bytes_t)&cmd->flags, 4);
+    out = str_field2hex0(out, "segment name: ", (bytes_t)cmd->segname, 16);
+    out = int_field2hex0(out, "vm address: ", (bytes_t)&cmd->vmaddr, 8);
+    out = int_field2hex0(out, "vm size: ", (bytes_t)&cmd->vmsize, 8);
+    out = int_field2hex0(out, "file offset: ", (bytes_t)&cmd->fileoff, 8);
+    out = int_field2hex0(out, "file size: ", (bytes_t)&cmd->filesize, 8);
+    out = int_field2hex0(out, "maxprot: ", (bytes_t)&cmd->maxprot, 4);
+    out = int_field2hex0(out, "initprot: ", (bytes_t)&cmd->initprot, 4);
+    out = int_field2hex0(out, "nsects: ", (bytes_t)&cmd->nsects, 4);
+    out = int_field2hex0(out, "flags: ", (bytes_t)&cmd->flags, 4);
     cmdsize = ((ssize_t)cmd->cmdsize) - sizeof(struct segment_command_64);
     section = (struct section_64 *)(((uintptr_t)cmd) + sizeof(struct segment_command_64));
     while (cmdsize >= sizeof(struct section_64))
@@ -1337,18 +1337,18 @@ char *segment_command2hex0(char *out, const struct segment_command_64 *cmd)
         /* command sections */
         cmdsize -= sizeof(struct section_64);
         out = title2hex0(out, (const char *)section->sectname, 16);
-        out = field_str2hex0(out, "section name: ", (bytes_t)section->sectname, 16);
-        out = field_str2hex0(out, "segment name: ", (bytes_t)section->segname, 16);
-        out = field_int2hex0(out, "memory address: ", (bytes_t)&section->addr, 8);
-        out = field_int2hex0(out, "memory size: ", (bytes_t)&section->size, 8);
-        out = field_int2hex0(out, "section offset: ", (bytes_t)&section->offset, 4);
-        out = field_int2hex0(out, "section alignment: ", (bytes_t)&section->align, 4); // TODO: pow_u32(2, section->align)
-        out = field_int2hex0(out, "relocation offset: ", (bytes_t)&section->reloff, 4);
-        out = field_int2hex0(out, "relocation number: ", (bytes_t)&section->nreloc, 4);
-        out = field_int2hex0(out, "flags: ", (bytes_t)&section->flags, 4);
-        out = field_int2hex0(out, "reserved1: ", (bytes_t)&section->reserved1, 4);
-        out = field_int2hex0(out, "reserved2: ", (bytes_t)&section->reserved2, 4);
-        out = field_int2hex0(out, "reserved3: ", (bytes_t)&section->reserved3, 4);
+        out = str_field2hex0(out, "section name: ", (bytes_t)section->sectname, 16);
+        out = str_field2hex0(out, "segment name: ", (bytes_t)section->segname, 16);
+        out = int_field2hex0(out, "memory address: ", (bytes_t)&section->addr, 8);
+        out = int_field2hex0(out, "memory size: ", (bytes_t)&section->size, 8);
+        out = int_field2hex0(out, "section offset: ", (bytes_t)&section->offset, 4);
+        out = int_field2hex0(out, "section alignment: ", (bytes_t)&section->align, 4); // TODO: pow_u32(2, section->align)
+        out = int_field2hex0(out, "relocation offset: ", (bytes_t)&section->reloff, 4);
+        out = int_field2hex0(out, "relocation number: ", (bytes_t)&section->nreloc, 4);
+        out = int_field2hex0(out, "flags: ", (bytes_t)&section->flags, 4);
+        out = int_field2hex0(out, "reserved1: ", (bytes_t)&section->reserved1, 4);
+        out = int_field2hex0(out, "reserved2: ", (bytes_t)&section->reserved2, 4);
+        out = int_field2hex0(out, "reserved3: ", (bytes_t)&section->reserved3, 4);
         ++section;
     }
     return out;
@@ -1368,8 +1368,8 @@ char *segment_command2hex0(char *out, const struct segment_command_64 *cmd)
 char *linkedit_command2hex0(char *out, const struct linkedit_data_command *cmd)
 {
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "data offset: ", (bytes_t)&cmd->dataoff, 4);
-    out = field_int2hex0(out, "data size: ", (bytes_t)&cmd->datasize, 4);
+    out = int_field2hex0(out, "data offset: ", (bytes_t)&cmd->dataoff, 4);
+    out = int_field2hex0(out, "data size: ", (bytes_t)&cmd->datasize, 4);
     return out;
 }
 
@@ -1379,10 +1379,10 @@ char *linkedit_command2hex0(char *out, const struct linkedit_data_command *cmd)
 char *symtab_command2hex0(char *out, const struct symtab_command *cmd)
 {
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "symbol table offset: ", (bytes_t)&cmd->symoff, 4);
-    out = field_int2hex0(out, "symbol table entries: ", (bytes_t)&cmd->nsyms, 4);
-    out = field_int2hex0(out, "string table offset: ", (bytes_t)&cmd->stroff, 4);
-    out = field_int2hex0(out, "string table size: ", (bytes_t)&cmd->strsize, 4);
+    out = int_field2hex0(out, "symbol table offset: ", (bytes_t)&cmd->symoff, 4);
+    out = int_field2hex0(out, "symbol table entries: ", (bytes_t)&cmd->nsyms, 4);
+    out = int_field2hex0(out, "string table offset: ", (bytes_t)&cmd->stroff, 4);
+    out = int_field2hex0(out, "string table size: ", (bytes_t)&cmd->strsize, 4);
     return out;
 }
 
@@ -1392,24 +1392,24 @@ char *symtab_command2hex0(char *out, const struct symtab_command *cmd)
 char *dysymtab_command2hex0(char *out, const struct dysymtab_command *cmd)
 {
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "index to localsymbol: ", (bytes_t)&cmd->ilocalsym, 4);
-    out = field_int2hex0(out, "number of symbols: ", (bytes_t)&cmd->nlocalsym, 4);
-    out = field_int2hex0(out, "iextdefsym: ", (bytes_t)&cmd->iextdefsym, 4);
-    out = field_int2hex0(out, "nextdefsym: ", (bytes_t)&cmd->nextdefsym, 4);
-    out = field_int2hex0(out, "iundefsym: ", (bytes_t)&cmd->iundefsym, 4);
-    out = field_int2hex0(out, "nundefsym: ", (bytes_t)&cmd->nundefsym, 4);
-    out = field_int2hex0(out, "tocoff: ", (bytes_t)&cmd->tocoff, 4);
-    out = field_int2hex0(out, "ntoc: ", (bytes_t)&cmd->ntoc, 4);
-    out = field_int2hex0(out, "module table offset: ", (bytes_t)&cmd->modtaboff, 4);
-    out = field_int2hex0(out, "module table entries: ", (bytes_t)&cmd->nmodtab, 4);
-    out = field_int2hex0(out, "extrefsymoff: ", (bytes_t)&cmd->extrefsymoff, 4);
-    out = field_int2hex0(out, "nextrefsyms: ", (bytes_t)&cmd->nextrefsyms, 4);
-    out = field_int2hex0(out, "indirectsymoff: ", (bytes_t)&cmd->indirectsymoff, 4);
-    out = field_int2hex0(out, "nindirectsyms: ", (bytes_t)&cmd->nindirectsyms, 4);
-    out = field_int2hex0(out, "extreloff: ", (bytes_t)&cmd->extreloff, 4);
-    out = field_int2hex0(out, "nextrel: ", (bytes_t)&cmd->nextrel, 4);
-    out = field_int2hex0(out, "locreloff: ", (bytes_t)&cmd->locreloff, 4);
-    out = field_int2hex0(out, "nlocrel: ", (bytes_t)&cmd->nlocrel, 4);
+    out = int_field2hex0(out, "index to localsymbol: ", (bytes_t)&cmd->ilocalsym, 4);
+    out = int_field2hex0(out, "number of symbols: ", (bytes_t)&cmd->nlocalsym, 4);
+    out = int_field2hex0(out, "iextdefsym: ", (bytes_t)&cmd->iextdefsym, 4);
+    out = int_field2hex0(out, "nextdefsym: ", (bytes_t)&cmd->nextdefsym, 4);
+    out = int_field2hex0(out, "iundefsym: ", (bytes_t)&cmd->iundefsym, 4);
+    out = int_field2hex0(out, "nundefsym: ", (bytes_t)&cmd->nundefsym, 4);
+    out = int_field2hex0(out, "tocoff: ", (bytes_t)&cmd->tocoff, 4);
+    out = int_field2hex0(out, "ntoc: ", (bytes_t)&cmd->ntoc, 4);
+    out = int_field2hex0(out, "module table offset: ", (bytes_t)&cmd->modtaboff, 4);
+    out = int_field2hex0(out, "module table entries: ", (bytes_t)&cmd->nmodtab, 4);
+    out = int_field2hex0(out, "extrefsymoff: ", (bytes_t)&cmd->extrefsymoff, 4);
+    out = int_field2hex0(out, "nextrefsyms: ", (bytes_t)&cmd->nextrefsyms, 4);
+    out = int_field2hex0(out, "indirectsymoff: ", (bytes_t)&cmd->indirectsymoff, 4);
+    out = int_field2hex0(out, "nindirectsyms: ", (bytes_t)&cmd->nindirectsyms, 4);
+    out = int_field2hex0(out, "extreloff: ", (bytes_t)&cmd->extreloff, 4);
+    out = int_field2hex0(out, "nextrel: ", (bytes_t)&cmd->nextrel, 4);
+    out = int_field2hex0(out, "locreloff: ", (bytes_t)&cmd->locreloff, 4);
+    out = int_field2hex0(out, "nlocrel: ", (bytes_t)&cmd->nlocrel, 4);
     return out;
 }
 
@@ -1421,11 +1421,11 @@ char *dylib_command2hex0(char *out, const struct dylib_command *cmd)
     bytes_t ptr = ((bytes_t)cmd) + sizeof(struct dylib_command);
     size_t len = cmd->cmdsize - sizeof(struct dylib_command);
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "name offset: ", (bytes_t)&cmd->dylib.name, 4);
-    out = field_int2hex0(out, "timestamp: ", (bytes_t)&cmd->dylib.timestamp, 4);
-    out = field_int2hex0(out, "current version: ", (bytes_t)&cmd->dylib.current_version, 4);
-    out = field_int2hex0(out, "compatibility: ", (bytes_t)&cmd->dylib.compatibility_version, 4);
-    out = field_str2hex0(out, "name: ", ptr, len);
+    out = int_field2hex0(out, "name offset: ", (bytes_t)&cmd->dylib.name, 4);
+    out = int_field2hex0(out, "timestamp: ", (bytes_t)&cmd->dylib.timestamp, 4);
+    out = int_field2hex0(out, "current version: ", (bytes_t)&cmd->dylib.current_version, 4);
+    out = int_field2hex0(out, "compatibility: ", (bytes_t)&cmd->dylib.compatibility_version, 4);
+    out = str_field2hex0(out, "name: ", ptr, len);
     return out;
 }
 
@@ -1433,8 +1433,8 @@ char *dylib_command2hex0(char *out, const struct dylib_command *cmd)
 char *entry_point_command2hex0(char *out, const struct entry_point_command *cmd)
 {
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "offset of main: ", (bytes_t)&cmd->entryoff, 8);
-    out = field_int2hex0(out, "initial stack size: ", (bytes_t)&cmd->stacksize, 8);
+    out = int_field2hex0(out, "offset of main: ", (bytes_t)&cmd->entryoff, 8);
+    out = int_field2hex0(out, "initial stack size: ", (bytes_t)&cmd->stacksize, 8);
     return out;
 }
 
@@ -1447,12 +1447,12 @@ char *build_version_command2hex0(char *out, const struct build_version_command *
 
     /* encode command fields */
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "platform: ", (bytes_t)&cmd->platform, 4);
+    out = int_field2hex0(out, "platform: ", (bytes_t)&cmd->platform, 4);
     *(version2str((char*)text, cmd->minos)) = 0;
-    out = field_val2hex0(out, "minos: ", (const char*)text, (bytes_t)&cmd->minos, 4);
+    out = lit_field2hex0(out, "minos: ", (const char*)text, (bytes_t)&cmd->minos, 4);
     *(version2str((char*)text, cmd->sdk)) = 0;
-    out = field_val2hex0(out, "sdk: ", (const char*)text, (bytes_t)&cmd->sdk, 4);
-    out = field_int2hex0(out, "number of entries: ", (bytes_t)&cmd->ntools, 4);
+    out = lit_field2hex0(out, "sdk: ", (const char*)text, (bytes_t)&cmd->sdk, 4);
+    out = int_field2hex0(out, "number of entries: ", (bytes_t)&cmd->ntools, 4);
     
     /* encode entries */
     len = cmd->cmdsize - sizeof(struct build_version_command);
@@ -1465,14 +1465,14 @@ char *build_version_command2hex0(char *out, const struct build_version_command *
 
         /* tool */
         val = (uint32_t)min((uintmax_t)len, UINTMAX_C(4));
-        out = field_int2hex0(out, "tool: ", ptr, (size_t)val);
+        out = int_field2hex0(out, "tool: ", ptr, (size_t)val);
         len -= val;
         ptr += val;
 
         /* version */
         val = (uint32_t)min((uintmax_t)len, UINTMAX_C(4));
         *(version2str((char*)text, (uint32_t)bytes2uint(ptr, (size_t)val))) = 0;
-        out = field_val2hex0(out, "version: ", (const char*)text, ptr, (size_t)val);
+        out = lit_field2hex0(out, "version: ", (const char*)text, ptr, (size_t)val);
         len -= val;
         ptr += val;
     }
@@ -1501,7 +1501,7 @@ char *uuid_command2hex0(char *out, const struct uuid_command *cmd)
 
     /* encode command fields */
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_val2hex0(out, "uuid: ", (const char*)uuid, (bytes_t)cmd->uuid, sizeof(cmd->uuid));
+    out = lit_field2hex0(out, "uuid: ", (const char*)uuid, (bytes_t)cmd->uuid, sizeof(cmd->uuid));
     return out;
 }
 
@@ -1523,7 +1523,7 @@ char *source_version_command2hex0(char *out, const struct source_version_command
 
     /* encode command fields */
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_val2hex0(out, "version: ", (const char*)version, (bytes_t)&cmd->version, sizeof(cmd->version));
+    out = lit_field2hex0(out, "version: ", (const char*)version, (bytes_t)&cmd->version, sizeof(cmd->version));
     return out;
 }
 
@@ -1536,9 +1536,9 @@ char *dylinker_command2hex0(char *out, const struct dylinker_command *cmd)
     end = ((bytes_t)cmd) + cmd->cmdsize;
     /* encode command fields */
     out = load_command_common2hex0(out, (const struct load_command*)cmd);
-    out = field_int2hex0(out, "name offset: ", (bytes_t)&cmd->name, 4);
+    out = int_field2hex0(out, "name offset: ", (bytes_t)&cmd->name, 4);
     if (ptr >= (((bytes_t)cmd) + sizeof(struct dylinker_command)) && (ptr+len) <= end)
-        out = field_str2hex0(out, "name: ", ptr, len);
+        out = str_field2hex0(out, "name: ", ptr, len);
     return out;
 }
 
@@ -1627,13 +1627,13 @@ char *unixthread_command2hex0(char *out, const struct mach_header *header, const
         break;
     }
     len = (size_t)min((uintmax_t)rem, (uintmax_t)sizeof(cmd->flavor));
-    out = field_val2hex0(out, "thread flavor: ", flavor, (bytes_t)&cmd->flavor, len);
+    out = lit_field2hex0(out, "thread flavor: ", flavor, (bytes_t)&cmd->flavor, len);
     if ((rem = rem - len) == 0) return out;
     ptr += len;
 
     /* thread state size (in 4-byte words) */
     len = (size_t)min((uintmax_t)rem, (uintmax_t)sizeof(cmd->count));
-    out = field_int2hex0(out, "thread state size: ", (bytes_t)&cmd->count, len);
+    out = int_field2hex0(out, "thread state size: ", (bytes_t)&cmd->count, len);
     if ((rem = rem - len) == 0) return out;
     ptr += len;
 
@@ -1651,45 +1651,45 @@ char *unixthread_command2hex0(char *out, const struct mach_header *header, const
     {
         switch (flavor_fmt) {
         case x86_THREAD_STATE32:
-            out = field_int2hex0(out, "eax: ", (bytes_t)&ts->x86.thread_32.eax, 4);
-            out = field_int2hex0(out, "ebx: ", (bytes_t)&ts->x86.thread_32.ebx, 4);
-            out = field_int2hex0(out, "ecx: ", (bytes_t)&ts->x86.thread_32.ecx, 4);
-            out = field_int2hex0(out, "edx: ", (bytes_t)&ts->x86.thread_32.edx, 4);
-            out = field_int2hex0(out, "edi: ", (bytes_t)&ts->x86.thread_32.edi, 4);
-            out = field_int2hex0(out, "esi: ", (bytes_t)&ts->x86.thread_32.esi, 4);
-            out = field_int2hex0(out, "ebp: ", (bytes_t)&ts->x86.thread_32.ebp, 4);
-            out = field_int2hex0(out, "esp: ", (bytes_t)&ts->x86.thread_32.esp, 4);
-            out = field_int2hex0(out, "ss: ", (bytes_t)&ts->x86.thread_32.ss, 4);
-            out = field_int2hex0(out, "eflags: ", (bytes_t)&ts->x86.thread_32.eflags, 4);
-            out = field_int2hex0(out, "eip: ", (bytes_t)&ts->x86.thread_32.eip, 4);
-            out = field_int2hex0(out, "cs: ", (bytes_t)&ts->x86.thread_32.cs, 4);
-            out = field_int2hex0(out, "ds: ", (bytes_t)&ts->x86.thread_32.ds, 4);
-            out = field_int2hex0(out, "es: ", (bytes_t)&ts->x86.thread_32.es, 4);
-            out = field_int2hex0(out, "fs: ", (bytes_t)&ts->x86.thread_32.fs, 4);
-            out = field_int2hex0(out, "gs: ", (bytes_t)&ts->x86.thread_32.gs, 4);
+            out = int_field2hex0(out, "eax: ", (bytes_t)&ts->x86.thread_32.eax, 4);
+            out = int_field2hex0(out, "ebx: ", (bytes_t)&ts->x86.thread_32.ebx, 4);
+            out = int_field2hex0(out, "ecx: ", (bytes_t)&ts->x86.thread_32.ecx, 4);
+            out = int_field2hex0(out, "edx: ", (bytes_t)&ts->x86.thread_32.edx, 4);
+            out = int_field2hex0(out, "edi: ", (bytes_t)&ts->x86.thread_32.edi, 4);
+            out = int_field2hex0(out, "esi: ", (bytes_t)&ts->x86.thread_32.esi, 4);
+            out = int_field2hex0(out, "ebp: ", (bytes_t)&ts->x86.thread_32.ebp, 4);
+            out = int_field2hex0(out, "esp: ", (bytes_t)&ts->x86.thread_32.esp, 4);
+            out = int_field2hex0(out, "ss: ", (bytes_t)&ts->x86.thread_32.ss, 4);
+            out = int_field2hex0(out, "eflags: ", (bytes_t)&ts->x86.thread_32.eflags, 4);
+            out = int_field2hex0(out, "eip: ", (bytes_t)&ts->x86.thread_32.eip, 4);
+            out = int_field2hex0(out, "cs: ", (bytes_t)&ts->x86.thread_32.cs, 4);
+            out = int_field2hex0(out, "ds: ", (bytes_t)&ts->x86.thread_32.ds, 4);
+            out = int_field2hex0(out, "es: ", (bytes_t)&ts->x86.thread_32.es, 4);
+            out = int_field2hex0(out, "fs: ", (bytes_t)&ts->x86.thread_32.fs, 4);
+            out = int_field2hex0(out, "gs: ", (bytes_t)&ts->x86.thread_32.gs, 4);
             break;
         case x86_THREAD_STATE64:
-            out = field_int2hex0(out, "rax: ", (bytes_t)&ts->x86.thread_64.rax, 8);
-            out = field_int2hex0(out, "rbx: ", (bytes_t)&ts->x86.thread_64.rbx, 8);
-            out = field_int2hex0(out, "rcx: ", (bytes_t)&ts->x86.thread_64.rcx, 8);
-            out = field_int2hex0(out, "rdx: ", (bytes_t)&ts->x86.thread_64.rdx, 8);
-            out = field_int2hex0(out, "rdi: ", (bytes_t)&ts->x86.thread_64.rdi, 8);
-            out = field_int2hex0(out, "rsi: ", (bytes_t)&ts->x86.thread_64.rsi, 8);
-            out = field_int2hex0(out, "rbp: ", (bytes_t)&ts->x86.thread_64.rbp, 8);
-            out = field_int2hex0(out, "rsp: ", (bytes_t)&ts->x86.thread_64.rsp, 8);
-            out = field_int2hex0(out, "r8: ", (bytes_t)&ts->x86.thread_64.r8, 8);
-            out = field_int2hex0(out, "r9: ", (bytes_t)&ts->x86.thread_64.r9, 8);
-            out = field_int2hex0(out, "r10: ", (bytes_t)&ts->x86.thread_64.r10, 8);
-            out = field_int2hex0(out, "r11: ", (bytes_t)&ts->x86.thread_64.r11, 8);
-            out = field_int2hex0(out, "r12: ", (bytes_t)&ts->x86.thread_64.r12, 8);
-            out = field_int2hex0(out, "r13: ", (bytes_t)&ts->x86.thread_64.r13, 8);
-            out = field_int2hex0(out, "r14: ", (bytes_t)&ts->x86.thread_64.r14, 8);
-            out = field_int2hex0(out, "r15: ", (bytes_t)&ts->x86.thread_64.r15, 8);
-            out = field_int2hex0(out, "rip: ", (bytes_t)&ts->x86.thread_64.rip, 8);
-            out = field_int2hex0(out, "rflags: ", (bytes_t)&ts->x86.thread_64.rflags, 8);
-            out = field_int2hex0(out, "cs: ", (bytes_t)&ts->x86.thread_64.cs, 8);
-            out = field_int2hex0(out, "fs: ", (bytes_t)&ts->x86.thread_64.fs, 8);
-            out = field_int2hex0(out, "gs: ", (bytes_t)&ts->x86.thread_64.gs, 8);
+            out = int_field2hex0(out, "rax: ", (bytes_t)&ts->x86.thread_64.rax, 8);
+            out = int_field2hex0(out, "rbx: ", (bytes_t)&ts->x86.thread_64.rbx, 8);
+            out = int_field2hex0(out, "rcx: ", (bytes_t)&ts->x86.thread_64.rcx, 8);
+            out = int_field2hex0(out, "rdx: ", (bytes_t)&ts->x86.thread_64.rdx, 8);
+            out = int_field2hex0(out, "rdi: ", (bytes_t)&ts->x86.thread_64.rdi, 8);
+            out = int_field2hex0(out, "rsi: ", (bytes_t)&ts->x86.thread_64.rsi, 8);
+            out = int_field2hex0(out, "rbp: ", (bytes_t)&ts->x86.thread_64.rbp, 8);
+            out = int_field2hex0(out, "rsp: ", (bytes_t)&ts->x86.thread_64.rsp, 8);
+            out = int_field2hex0(out, "r8: ", (bytes_t)&ts->x86.thread_64.r8, 8);
+            out = int_field2hex0(out, "r9: ", (bytes_t)&ts->x86.thread_64.r9, 8);
+            out = int_field2hex0(out, "r10: ", (bytes_t)&ts->x86.thread_64.r10, 8);
+            out = int_field2hex0(out, "r11: ", (bytes_t)&ts->x86.thread_64.r11, 8);
+            out = int_field2hex0(out, "r12: ", (bytes_t)&ts->x86.thread_64.r12, 8);
+            out = int_field2hex0(out, "r13: ", (bytes_t)&ts->x86.thread_64.r13, 8);
+            out = int_field2hex0(out, "r14: ", (bytes_t)&ts->x86.thread_64.r14, 8);
+            out = int_field2hex0(out, "r15: ", (bytes_t)&ts->x86.thread_64.r15, 8);
+            out = int_field2hex0(out, "rip: ", (bytes_t)&ts->x86.thread_64.rip, 8);
+            out = int_field2hex0(out, "rflags: ", (bytes_t)&ts->x86.thread_64.rflags, 8);
+            out = int_field2hex0(out, "cs: ", (bytes_t)&ts->x86.thread_64.cs, 8);
+            out = int_field2hex0(out, "fs: ", (bytes_t)&ts->x86.thread_64.fs, 8);
+            out = int_field2hex0(out, "gs: ", (bytes_t)&ts->x86.thread_64.gs, 8);
             break;
         case x86_FLOAT_STATE32:
         case x86_EXCEPTION_STATE32:
@@ -1722,61 +1722,61 @@ char *unixthread_command2hex0(char *out, const struct mach_header *header, const
         || header->cputype == CPU_TYPE_ARM64_32) {
         switch (flavor_fmt) {
         case ARM_THREAD_STATE32:
-            out = field_int2hex0(out, "r0: ", (bytes_t)&ts->arm.thread_32.r[0], 4);
-            out = field_int2hex0(out, "r1: ", (bytes_t)&ts->arm.thread_32.r[1], 4);
-            out = field_int2hex0(out, "r2: ", (bytes_t)&ts->arm.thread_32.r[2], 4);
-            out = field_int2hex0(out, "r3: ", (bytes_t)&ts->arm.thread_32.r[3], 4);
-            out = field_int2hex0(out, "r4: ", (bytes_t)&ts->arm.thread_32.r[4], 4);
-            out = field_int2hex0(out, "r5: ", (bytes_t)&ts->arm.thread_32.r[5], 4);
-            out = field_int2hex0(out, "r6: ", (bytes_t)&ts->arm.thread_32.r[6], 4);
-            out = field_int2hex0(out, "r7: ", (bytes_t)&ts->arm.thread_32.r[7], 4);
-            out = field_int2hex0(out, "r8: ", (bytes_t)&ts->arm.thread_32.r[8], 4);
-            out = field_int2hex0(out, "r9: ", (bytes_t)&ts->arm.thread_32.r[9], 4);
-            out = field_int2hex0(out, "r10: ", (bytes_t)&ts->arm.thread_32.r[10], 4);
-            out = field_int2hex0(out, "r11: ", (bytes_t)&ts->arm.thread_32.r[11], 4);
-            out = field_int2hex0(out, "r12: ", (bytes_t)&ts->arm.thread_32.r[12], 4);
-            out = field_int2hex0(out, "sp: ", (bytes_t)&ts->arm.thread_32.sp, 4);
-            out = field_int2hex0(out, "lr: ", (bytes_t)&ts->arm.thread_32.lr, 4);
-            out = field_int2hex0(out, "pc: ", (bytes_t)&ts->arm.thread_32.pc, 4);
-            out = field_int2hex0(out, "cpsr: ", (bytes_t)&ts->arm.thread_32.cpsr, 4);
+            out = int_field2hex0(out, "r0: ", (bytes_t)&ts->arm.thread_32.r[0], 4);
+            out = int_field2hex0(out, "r1: ", (bytes_t)&ts->arm.thread_32.r[1], 4);
+            out = int_field2hex0(out, "r2: ", (bytes_t)&ts->arm.thread_32.r[2], 4);
+            out = int_field2hex0(out, "r3: ", (bytes_t)&ts->arm.thread_32.r[3], 4);
+            out = int_field2hex0(out, "r4: ", (bytes_t)&ts->arm.thread_32.r[4], 4);
+            out = int_field2hex0(out, "r5: ", (bytes_t)&ts->arm.thread_32.r[5], 4);
+            out = int_field2hex0(out, "r6: ", (bytes_t)&ts->arm.thread_32.r[6], 4);
+            out = int_field2hex0(out, "r7: ", (bytes_t)&ts->arm.thread_32.r[7], 4);
+            out = int_field2hex0(out, "r8: ", (bytes_t)&ts->arm.thread_32.r[8], 4);
+            out = int_field2hex0(out, "r9: ", (bytes_t)&ts->arm.thread_32.r[9], 4);
+            out = int_field2hex0(out, "r10: ", (bytes_t)&ts->arm.thread_32.r[10], 4);
+            out = int_field2hex0(out, "r11: ", (bytes_t)&ts->arm.thread_32.r[11], 4);
+            out = int_field2hex0(out, "r12: ", (bytes_t)&ts->arm.thread_32.r[12], 4);
+            out = int_field2hex0(out, "sp: ", (bytes_t)&ts->arm.thread_32.sp, 4);
+            out = int_field2hex0(out, "lr: ", (bytes_t)&ts->arm.thread_32.lr, 4);
+            out = int_field2hex0(out, "pc: ", (bytes_t)&ts->arm.thread_32.pc, 4);
+            out = int_field2hex0(out, "cpsr: ", (bytes_t)&ts->arm.thread_32.cpsr, 4);
             break;
         case ARM_THREAD_STATE64:
-            out = field_int2hex0(out, "x0: ", (bytes_t)&ts->arm.thread_64.x[0], 8);
-            out = field_int2hex0(out, "x1: ", (bytes_t)&ts->arm.thread_64.x[1], 8);
-            out = field_int2hex0(out, "x2: ", (bytes_t)&ts->arm.thread_64.x[2], 8);
-            out = field_int2hex0(out, "x3: ", (bytes_t)&ts->arm.thread_64.x[3], 8);
-            out = field_int2hex0(out, "x4: ", (bytes_t)&ts->arm.thread_64.x[4], 8);
-            out = field_int2hex0(out, "x5: ", (bytes_t)&ts->arm.thread_64.x[5], 8);
-            out = field_int2hex0(out, "x6: ", (bytes_t)&ts->arm.thread_64.x[6], 8);
-            out = field_int2hex0(out, "x7: ", (bytes_t)&ts->arm.thread_64.x[7], 8);
-            out = field_int2hex0(out, "x8: ", (bytes_t)&ts->arm.thread_64.x[8], 8);
-            out = field_int2hex0(out, "x9: ", (bytes_t)&ts->arm.thread_64.x[9], 8);
-            out = field_int2hex0(out, "x10: ", (bytes_t)&ts->arm.thread_64.x[10], 8);
-            out = field_int2hex0(out, "x11: ", (bytes_t)&ts->arm.thread_64.x[11], 8);
-            out = field_int2hex0(out, "x12: ", (bytes_t)&ts->arm.thread_64.x[12], 8);
-            out = field_int2hex0(out, "x13: ", (bytes_t)&ts->arm.thread_64.x[13], 8);
-            out = field_int2hex0(out, "x14: ", (bytes_t)&ts->arm.thread_64.x[14], 8);
-            out = field_int2hex0(out, "x15: ", (bytes_t)&ts->arm.thread_64.x[15], 8);
-            out = field_int2hex0(out, "x16: ", (bytes_t)&ts->arm.thread_64.x[16], 8);
-            out = field_int2hex0(out, "x17: ", (bytes_t)&ts->arm.thread_64.x[17], 8);
-            out = field_int2hex0(out, "x17: ", (bytes_t)&ts->arm.thread_64.x[17], 8);
-            out = field_int2hex0(out, "x18: ", (bytes_t)&ts->arm.thread_64.x[18], 8);
-            out = field_int2hex0(out, "x19: ", (bytes_t)&ts->arm.thread_64.x[19], 8);
-            out = field_int2hex0(out, "x20: ", (bytes_t)&ts->arm.thread_64.x[20], 8);
-            out = field_int2hex0(out, "x21: ", (bytes_t)&ts->arm.thread_64.x[21], 8);
-            out = field_int2hex0(out, "x22: ", (bytes_t)&ts->arm.thread_64.x[22], 8);
-            out = field_int2hex0(out, "x23: ", (bytes_t)&ts->arm.thread_64.x[23], 8);
-            out = field_int2hex0(out, "x24: ", (bytes_t)&ts->arm.thread_64.x[24], 8);
-            out = field_int2hex0(out, "x25: ", (bytes_t)&ts->arm.thread_64.x[25], 8);
-            out = field_int2hex0(out, "x26: ", (bytes_t)&ts->arm.thread_64.x[26], 8);
-            out = field_int2hex0(out, "x27: ", (bytes_t)&ts->arm.thread_64.x[27], 8);
-            out = field_int2hex0(out, "x27: ", (bytes_t)&ts->arm.thread_64.x[27], 8);
-            out = field_int2hex0(out, "x28: ", (bytes_t)&ts->arm.thread_64.x[28], 8);
-            out = field_int2hex0(out, "sp: ", (bytes_t)&ts->arm.thread_64.sp, 8);
-            out = field_int2hex0(out, "lr: ", (bytes_t)&ts->arm.thread_64.lr, 8);
-            out = field_int2hex0(out, "pc: ", (bytes_t)&ts->arm.thread_64.pc, 8);
-            out = field_int2hex0(out, "cpsr: ", (bytes_t)&ts->arm.thread_64.cpsr, 4);
-            out = field_int2hex0(out, "flags: ", (bytes_t)&ts->arm.thread_64.flags, 4);
+            out = int_field2hex0(out, "x0: ", (bytes_t)&ts->arm.thread_64.x[0], 8);
+            out = int_field2hex0(out, "x1: ", (bytes_t)&ts->arm.thread_64.x[1], 8);
+            out = int_field2hex0(out, "x2: ", (bytes_t)&ts->arm.thread_64.x[2], 8);
+            out = int_field2hex0(out, "x3: ", (bytes_t)&ts->arm.thread_64.x[3], 8);
+            out = int_field2hex0(out, "x4: ", (bytes_t)&ts->arm.thread_64.x[4], 8);
+            out = int_field2hex0(out, "x5: ", (bytes_t)&ts->arm.thread_64.x[5], 8);
+            out = int_field2hex0(out, "x6: ", (bytes_t)&ts->arm.thread_64.x[6], 8);
+            out = int_field2hex0(out, "x7: ", (bytes_t)&ts->arm.thread_64.x[7], 8);
+            out = int_field2hex0(out, "x8: ", (bytes_t)&ts->arm.thread_64.x[8], 8);
+            out = int_field2hex0(out, "x9: ", (bytes_t)&ts->arm.thread_64.x[9], 8);
+            out = int_field2hex0(out, "x10: ", (bytes_t)&ts->arm.thread_64.x[10], 8);
+            out = int_field2hex0(out, "x11: ", (bytes_t)&ts->arm.thread_64.x[11], 8);
+            out = int_field2hex0(out, "x12: ", (bytes_t)&ts->arm.thread_64.x[12], 8);
+            out = int_field2hex0(out, "x13: ", (bytes_t)&ts->arm.thread_64.x[13], 8);
+            out = int_field2hex0(out, "x14: ", (bytes_t)&ts->arm.thread_64.x[14], 8);
+            out = int_field2hex0(out, "x15: ", (bytes_t)&ts->arm.thread_64.x[15], 8);
+            out = int_field2hex0(out, "x16: ", (bytes_t)&ts->arm.thread_64.x[16], 8);
+            out = int_field2hex0(out, "x17: ", (bytes_t)&ts->arm.thread_64.x[17], 8);
+            out = int_field2hex0(out, "x17: ", (bytes_t)&ts->arm.thread_64.x[17], 8);
+            out = int_field2hex0(out, "x18: ", (bytes_t)&ts->arm.thread_64.x[18], 8);
+            out = int_field2hex0(out, "x19: ", (bytes_t)&ts->arm.thread_64.x[19], 8);
+            out = int_field2hex0(out, "x20: ", (bytes_t)&ts->arm.thread_64.x[20], 8);
+            out = int_field2hex0(out, "x21: ", (bytes_t)&ts->arm.thread_64.x[21], 8);
+            out = int_field2hex0(out, "x22: ", (bytes_t)&ts->arm.thread_64.x[22], 8);
+            out = int_field2hex0(out, "x23: ", (bytes_t)&ts->arm.thread_64.x[23], 8);
+            out = int_field2hex0(out, "x24: ", (bytes_t)&ts->arm.thread_64.x[24], 8);
+            out = int_field2hex0(out, "x25: ", (bytes_t)&ts->arm.thread_64.x[25], 8);
+            out = int_field2hex0(out, "x26: ", (bytes_t)&ts->arm.thread_64.x[26], 8);
+            out = int_field2hex0(out, "x27: ", (bytes_t)&ts->arm.thread_64.x[27], 8);
+            out = int_field2hex0(out, "x27: ", (bytes_t)&ts->arm.thread_64.x[27], 8);
+            out = int_field2hex0(out, "x28: ", (bytes_t)&ts->arm.thread_64.x[28], 8);
+            out = int_field2hex0(out, "sp: ", (bytes_t)&ts->arm.thread_64.sp, 8);
+            out = int_field2hex0(out, "lr: ", (bytes_t)&ts->arm.thread_64.lr, 8);
+            out = int_field2hex0(out, "pc: ", (bytes_t)&ts->arm.thread_64.pc, 8);
+            out = int_field2hex0(out, "cpsr: ", (bytes_t)&ts->arm.thread_64.cpsr, 4);
+            out = int_field2hex0(out, "flags: ", (bytes_t)&ts->arm.thread_64.flags, 4);
             break;
             case ARM_THREAD_STATE:
             case ARM_VFP_STATE:
@@ -1902,7 +1902,8 @@ char *load_command2hex0(char *out, const struct mach_header *header, const struc
  */
 int parse(uint8_t *buffer, size_t len)
 {
-    uint32_t cmd_count, cmd_size;
+    const struct load_command *cmd;
+    uint32_t cmd_count, cmdsize;
     ssize_t ret;
     mach_decoded_t p;
     char buf[8192];
@@ -1916,9 +1917,17 @@ int parse(uint8_t *buffer, size_t len)
     fputs(buf, stdout);
     fflush(stdout);
     cmd_count = 0;
+    cmdsize = 0;
     while (cmd_count < p.header.ncmds)
     {
-        ++cmd_count;
+        if ((cmd = p.load_commands[(size_t)(cmd_count++)]) == NULL)
+            fail(1, "command %"PRIu32" doesn't exists\n", cmd_count);
+        if (cmd->cmdsize >= (UINT32_MAX - cmdsize))
+            fail(1, "command %"PRIu32" size overflow: %"PRIu32"/%"PRIu32"\n", cmd_count, cmd->cmdsize, cmdsize);
+        if (cmd->cmdsize < sizeof(struct load_command))
+            fail(1, "invalid command %"PRIu32", cmdsize: %"PRIu32" < %"PRIu32"\n", cmd_count, cmd->cmdsize, sizeof(struct load_command));
+        cmdsize += cmd->cmdsize;
+
         // -- TITLE --
         // use the last 128 bytes of the buffer to format the title
         out = (char*)(((uintptr_t)buf) + sizeof(buf) - 128);
@@ -1939,12 +1948,14 @@ int parse(uint8_t *buffer, size_t len)
         out = load_command2hex0(
             out,
             (const struct mach_header*)&p.header,
-            p.load_commands[(cmd_count-1)]
+            p.load_commands[(size_t)(cmd_count-1)]
         );
         *out = 0;
         fputs(buf, stdout);
         fflush(stdout);
     }
+    if (cmdsize != p.header.sizeofcmds)
+        fail(1, "invalid mach-o, command size mismatch\nexpected: %"PRIu32"\n  actual: %"PRIu32"\n", p.header.sizeofcmds, cmdsize);
     return 0;
 }
 

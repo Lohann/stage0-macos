@@ -8,6 +8,7 @@
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/EXTERNAL_HEADERS/mach-o/loader.h#L50-L81
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/machine.h#L127-L482
  * - https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/mach_loader.c#L1225-L1996
+ * - https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/MachOTopics/1-Articles/executing_files.html
  * - https://github.com/aidansteele/osx-abi-macho-file-format-reference
  * - https://www.macsyscalls.com/en/syscall
  *
@@ -1311,6 +1312,9 @@ struct unixthread_command {
 /// section with only pointers to
 #define S_LITERAL_POINTERS 0x5
 
+/// symbol is not in any section
+#define	NO_SECT 0	
+
 /// if any of these bits set, a symbolic debugging entry
 #define N_STAB 0xe0
 
@@ -1655,21 +1659,198 @@ enum reloc_type_x86_64
 };
 
 
-// https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.121.6/osfmk/mach/machine.h
 /*
- *	ARM subtypes
+ * LC_DYLD_CHAINED_FIXUPS
+ * Reference:
+ * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/EXTERNAL_HEADERS/mach-o/fixup-chains.h#L89 
  */
+// header of the LC_DYLD_CHAINED_FIXUPS payload
+struct dyld_chained_fixups_header
+{
+    uint32_t    fixups_version;    // 0
+    uint32_t    starts_offset;     // offset of dyld_chained_starts_in_image in chain_data
+    uint32_t    imports_offset;    // offset of imports table in chain_data
+    uint32_t    symbols_offset;    // offset of symbol strings in chain_data
+    uint32_t    imports_count;     // number of imported symbol names
+    uint32_t    imports_format;    // DYLD_CHAINED_IMPORT*
+    uint32_t    symbols_format;    // 0 => uncompressed, 1 => zlib compressed
+};
+
+// This struct is embedded in LC_DYLD_CHAINED_FIXUPS payload
+struct dyld_chained_starts_in_image
+{
+    uint32_t    seg_count;
+    uint32_t    seg_info_offset[1];  // each entry is offset into this struct for that segment
+    // followed by pool of dyld_chain_starts_in_segment data
+};
+
+// This struct is embedded in dyld_chain_starts_in_image
+// and passed down to the kernel for page-in linking
+struct dyld_chained_starts_in_segment
+{
+    uint32_t    size;               // size of this (amount kernel needs to copy)
+    uint16_t    page_size;          // 0x1000 or 0x4000
+    uint16_t    pointer_format;     // DYLD_CHAINED_PTR_*
+    uint64_t    segment_offset;     // offset in memory to start of segment
+    uint32_t    max_valid_pointer;  // for 32-bit OS, any value beyond this is not a pointer
+    uint16_t    page_count;         // how many pages are in array
+    uint16_t    page_start[1];      // each entry is offset in each page of first element in chain
+                                    // or DYLD_CHAINED_PTR_START_NONE if no fixups on page
+ // uint16_t    chain_starts[1];    // some 32-bit formats may require multiple starts per page.
+                                    // for those, if high bit is set in page_starts[], then it
+                                    // is index into chain_starts[] which is a list of starts
+                                    // the last of which has the high bit set
+};
+
+enum {
+    DYLD_CHAINED_PTR_START_NONE   = 0xFFFF, // used in page_start[] to denote a page with no fixups
+    DYLD_CHAINED_PTR_START_MULTI  = 0x8000, // used in page_start[] to denote a page which has multiple starts
+    DYLD_CHAINED_PTR_START_LAST   = 0x8000, // used in chain_starts[] to denote last start in list for page
+};
+
+// This struct is embedded in __TEXT,__chain_starts section in firmware
+struct dyld_chained_starts_offsets
+{
+    uint32_t    pointer_format;     // DYLD_CHAINED_PTR_32_FIRMWARE
+    uint32_t    starts_count;       // number of starts in array
+    uint32_t    chain_starts[1];    // array chain start offsets
+};
+
+// values for dyld_chained_starts_in_segment.pointer_format
+enum {
+    DYLD_CHAINED_PTR_ARM64E                 =  1,    // stride 8, unauth target is vmaddr
+    DYLD_CHAINED_PTR_64                     =  2,    // target is vmaddr
+    DYLD_CHAINED_PTR_32                     =  3,
+    DYLD_CHAINED_PTR_32_CACHE               =  4,
+    DYLD_CHAINED_PTR_32_FIRMWARE            =  5,
+    DYLD_CHAINED_PTR_64_OFFSET              =  6,    // target is vm offset
+    DYLD_CHAINED_PTR_ARM64E_OFFSET          =  7,    // old name
+    DYLD_CHAINED_PTR_ARM64E_KERNEL          =  7,    // stride 4, unauth target is vm offset
+    DYLD_CHAINED_PTR_64_KERNEL_CACHE        =  8,
+    DYLD_CHAINED_PTR_ARM64E_USERLAND        =  9,    // stride 8, unauth target is vm offset
+    DYLD_CHAINED_PTR_ARM64E_FIRMWARE        = 10,    // stride 4, unauth target is vmaddr
+    DYLD_CHAINED_PTR_X86_64_KERNEL_CACHE    = 11,    // stride 1, x86_64 kernel caches
+    DYLD_CHAINED_PTR_ARM64E_USERLAND24      = 12,    // stride 8, unauth target is vm offset, 24-bit bind
+    DYLD_CHAINED_PTR_ARM64E_SHARED_CACHE    = 13,    // stride 8, regular/auth targets both vm offsets.  Only A keys supported
+};
+
+// DYLD_CHAINED_PTR_ARM64E
+typedef uint64_t dyld_chained_ptr_arm64e_rebase;
+typedef uint64_t dyld_chained_ptr_arm64e_bind;
+typedef uint64_t dyld_chained_ptr_arm64e_auth_rebase;
+typedef uint64_t dyld_chained_ptr_arm64e_auth_bind;
+
+// DYLD_CHAINED_PTR_64/DYLD_CHAINED_PTR_64_OFFSET
+typedef uint64_t dyld_chained_ptr_64_rebase;
+
+// DYLD_CHAINED_PTR_ARM64E_USERLAND24
+typedef uint64_t dyld_chained_ptr_arm64e_bind24;
+typedef uint64_t dyld_chained_ptr_arm64e_auth_bind24;
+
+// DYLD_CHAINED_PTR_64
+typedef uint64_t dyld_chained_ptr_64_bind;
+
+// DYLD_CHAINED_PTR_64_KERNEL_CACHE, DYLD_CHAINED_PTR_X86_64_KERNEL_CACHE
+typedef uint64_t dyld_chained_ptr_64_kernel_cache_rebase;
+
+// DYLD_CHAINED_PTR_32
+// Note: for DYLD_CHAINED_PTR_32 some non-pointer values are co-opted into the chain
+// as out of range rebases.  If an entry in the chain is > max_valid_pointer, then it
+// is not a pointer.  To restore the value, subtract off the bias, which is
+// (64MB+max_valid_pointer)/2.
+typedef uint32_t dyld_chained_ptr_32_rebase;
+
+// DYLD_CHAINED_PTR_32
+typedef uint32_t dyld_chained_ptr_32_bind;
+
+// DYLD_CHAINED_PTR_32_CACHE
+typedef uint32_t dyld_chained_ptr_32_cache_rebase;
+
+// DYLD_CHAINED_PTR_32_FIRMWARE
+typedef uint32_t dyld_chained_ptr_32_firmware_rebase;
+
+// DYLD_CHAINED_PTR_ARM64E_SHARED_CACHE
+typedef uint64_t dyld_chained_ptr_arm64e_shared_cache_rebase;
+typedef uint64_t dyld_chained_ptr_arm64e_shared_cache_auth_rebase;
+
+// values for dyld_chained_fixups_header.imports_format
+#define DYLD_CHAINED_IMPORT 1
+#define DYLD_CHAINED_IMPORT_ADDEND 2
+#define DYLD_CHAINED_IMPORT_ADDEND64 3
+
+// DYLD_CHAINED_IMPORT
+typedef uint32_t dyld_chained_import;
+
+// DYLD_CHAINED_IMPORT_ADDEND
+struct dyld_chained_import_addend
+{
+    uint32_t name_offset;
+    int32_t     addend;
+};
+
+// DYLD_CHAINED_IMPORT_ADDEND64
+struct dyld_chained_import_addend64
+{
+    uint16_t lib_ordinal;
+    uint16_t weak_import;
+    uint32_t name_offset;
+    uint64_t addend;
+};
+
+/* 
+ * SecCodeSignatureFlags
+ * Reference:
+ * https://github.com/apple-oss-distributions/Security/blob/db15acbe6a7f257a859ad9a3bb86097bfe0679d9/header_symlinks/Security/CSCommon.h#L251-L299
+ */
+// Indicates that the code may act as a host that controls and supervises guest
+// code. If this flag is not set in a code signature, the code is never considered
+// eligible to be a host, and any attempt to act like one will be ignored or rejected.
+#define kSecCodeSignatureHost 0x0001 /* may host guest code */
+
+// The code has been sealed without a signing identity. No identity may be retrieved
+// from it, and any code requirement placing restrictions on the signing identity
+// will fail. This flag is set by the code signing API and cannot be set explicitly.
+#define kSecCodeSignatureAdhoc 0x0002 /* must be used without signer */
+
+// Implicitly set the "hard" status bit for the code when it starts running.
+// This bit indicates that the code prefers to be denied access to a resource
+// if gaining such access would cause its invalidation. Since the hard bit is
+// sticky, setting this option bit guarantees that the code will always have
+// it set.
+#define kSecCodeSignatureForceHard 0x0100 /* always set HARD mode on launch */
+
+// Implicitly set the "kill" status bit for the code when it starts running.
+// This bit indicates that the code wishes to be terminated with prejudice if
+// it is ever invalidated. Since the kill bit is sticky, setting this option bit
+// guarantees that the code will always be dynamically valid, since it will die
+// immediately	if it becomes invalid.
+#define kSecCodeSignatureForceKill 0x0200 /* always set KILL mode on launch */
+
+// Forces the kSecCSConsiderExpiration flag on all validations of the code.
+#define kSecCodeSignatureForceExpiration 0x0400 /* force certificate expiration checks */
+
+#define kSecCodeSignatureRestrict 0x0800 /* restrict dyld loading */
+#define kSecCodeSignatureEnforcement 0x1000 /* enforce code signing */
+#define kSecCodeSignatureLibraryValidation 0x2000 /* library validation required */
+
+// Instructs the kernel to apply runtime hardening policies as required by the
+// hardened runtime version
+#define kSecCodeSignatureRuntime 0x10000 /* apply runtime hardening policies */
+
+// The code was automatically signed by the linker. This signature should be
+// ignored in any new signing operation.
+#define kSecCodeSignatureLinkerSigned 0x20000 /* identify that the signature was auto-generated by the linker*/
+
 /*
- * Capability bits used in the definition of cpu_type.
+ * ARM subtypes
+ * https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.121.6/osfmk/mach/machine.h
  */
+/* Capability bits used in the definition of cpu_type. */
 #define CPU_ARCH_MASK           0xff000000      /* mask for architecture bits */
 #define CPU_ARCH_ABI64          0x01000000      /* 64 bit ABI */
 #define CPU_ARCH_ABI64_32       0x02000000      /* ABI for 64-bit hardware with 32-bit types; LP32 */
 
-/*
- *	Machine types known by all.
- */
-
+/* Machine types known by all. */
 #define CPU_TYPE_ANY            ((cpu_type_t) -1)
 
 #define CPU_TYPE_VAX            ((cpu_type_t) 1)
@@ -1696,7 +1877,7 @@ enum reloc_type_x86_64
 /* skip				((cpu_type_t) 17)	*/
 #define CPU_TYPE_POWERPC                ((cpu_type_t) 18)
 #define CPU_TYPE_POWERPC64              (CPU_TYPE_POWERPC | CPU_ARCH_ABI64)
-/* skip				((cpu_type_t) 19)	*/
+/* skip				((cpu_type_t) 19) */
 /* skip				((cpu_type_t) 20) */
 /* skip				((cpu_type_t) 21) */
 /* skip				((cpu_type_t) 22) */
@@ -3032,4 +3213,91 @@ union thread_state {
         struct x86_saved_state32 saved_32;
         struct x86_saved_state64 saved_64;
     } x86;
+};
+
+/*
+ * Magic numbers used by Code Signing
+ * Reference:
+ * https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/kern/cs_blobs.h#L91-L171
+ */
+enum {
+	CSMAGIC_REQUIREMENT = 0xfade0c00,               /* single Requirement blob */
+	CSMAGIC_REQUIREMENTS = 0xfade0c01,              /* Requirements vector (internal requirements) */
+	CSMAGIC_CODEDIRECTORY = 0xfade0c02,             /* CodeDirectory blob */
+	CSMAGIC_EMBEDDED_SIGNATURE = 0xfade0cc0, /* embedded form of signature data */
+	CSMAGIC_EMBEDDED_SIGNATURE_OLD = 0xfade0b02,    /* XXX */
+	CSMAGIC_EMBEDDED_ENTITLEMENTS = 0xfade7171,     /* embedded entitlements */
+	CSMAGIC_EMBEDDED_DER_ENTITLEMENTS = 0xfade7172, /* embedded DER encoded entitlements */
+	CSMAGIC_DETACHED_SIGNATURE = 0xfade0cc1, /* multi-arch collection of embedded signatures */
+	CSMAGIC_BLOBWRAPPER = 0xfade0b01,       /* CMS Signature, among other things */
+	CSMAGIC_EMBEDDED_LAUNCH_CONSTRAINT = 0xfade8181, /* Light weight code requirement */
+
+	CS_SUPPORTSSCATTER = 0x20100,
+	CS_SUPPORTSTEAMID = 0x20200,
+	CS_SUPPORTSCODELIMIT64 = 0x20300,
+	CS_SUPPORTSEXECSEG = 0x20400,
+	CS_SUPPORTSRUNTIME = 0x20500,
+	CS_SUPPORTSLINKAGE = 0x20600,
+
+	CSSLOT_CODEDIRECTORY = 0,                               /* slot index for CodeDirectory */
+	CSSLOT_INFOSLOT = 1,
+	CSSLOT_REQUIREMENTS = 2,
+	CSSLOT_RESOURCEDIR = 3,
+	CSSLOT_APPLICATION = 4,
+	CSSLOT_ENTITLEMENTS = 5,
+	CSSLOT_DER_ENTITLEMENTS = 7,
+	CSSLOT_LAUNCH_CONSTRAINT_SELF = 8,
+	CSSLOT_LAUNCH_CONSTRAINT_PARENT = 9,
+	CSSLOT_LAUNCH_CONSTRAINT_RESPONSIBLE = 10,
+	CSSLOT_LIBRARY_CONSTRAINT = 11,
+
+	CSSLOT_ALTERNATE_CODEDIRECTORIES = 0x1000, /* first alternate CodeDirectory, if any */
+	CSSLOT_ALTERNATE_CODEDIRECTORY_MAX = 5,         /* max number of alternate CD slots */
+	CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT = CSSLOT_ALTERNATE_CODEDIRECTORIES + CSSLOT_ALTERNATE_CODEDIRECTORY_MAX, /* one past the last */
+
+	CSSLOT_SIGNATURESLOT = 0x10000,                 /* CMS Signature */
+	CSSLOT_IDENTIFICATIONSLOT = 0x10001,
+	CSSLOT_TICKETSLOT = 0x10002,
+
+	CSTYPE_INDEX_REQUIREMENTS = 0x00000002,         /* compat with amfi */
+	CSTYPE_INDEX_ENTITLEMENTS = 0x00000005,         /* compat with amfi */
+
+	CS_HASHTYPE_SHA1 = 1,
+	CS_HASHTYPE_SHA256 = 2,
+	CS_HASHTYPE_SHA256_TRUNCATED = 3,
+	CS_HASHTYPE_SHA384 = 4,
+
+	CS_SHA1_LEN = 20,
+	CS_SHA256_LEN = 32,
+	CS_SHA256_TRUNCATED_LEN = 20,
+
+	CS_CDHASH_LEN = 20,                                             /* always - larger hashes are truncated */
+	CS_HASH_MAX_SIZE = 48, /* max size of the hash we'll support */
+
+    /*
+     * Currently only to support Legacy VPN plugins, and Mac App Store
+     * but intended to replace all the various platform code, dev code etc. bits.
+     */
+	CS_SIGNER_TYPE_UNKNOWN = 0,
+	CS_SIGNER_TYPE_LEGACYVPN = 5,
+	CS_SIGNER_TYPE_MAC_APP_STORE = 6,
+
+	CS_SUPPL_SIGNER_TYPE_UNKNOWN = 0,
+	CS_SUPPL_SIGNER_TYPE_TRUSTCACHE = 7,
+	CS_SUPPL_SIGNER_TYPE_LOCAL = 8,
+
+	CS_SIGNER_TYPE_OOPJIT = 9,
+
+	/* Validation categories used for trusted launch environment */
+	CS_VALIDATION_CATEGORY_INVALID = 0,
+	CS_VALIDATION_CATEGORY_PLATFORM = 1,
+	CS_VALIDATION_CATEGORY_TESTFLIGHT = 2,
+	CS_VALIDATION_CATEGORY_DEVELOPMENT = 3,
+	CS_VALIDATION_CATEGORY_APP_STORE = 4,
+	CS_VALIDATION_CATEGORY_ENTERPRISE = 5,
+	CS_VALIDATION_CATEGORY_DEVELOPER_ID = 6,
+	CS_VALIDATION_CATEGORY_LOCAL_SIGNING = 7,
+	CS_VALIDATION_CATEGORY_ROSETTA = 8,
+	CS_VALIDATION_CATEGORY_OOPJIT = 9,
+	CS_VALIDATION_CATEGORY_NONE = 10,
 };

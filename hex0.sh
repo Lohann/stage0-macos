@@ -167,6 +167,9 @@ do
       *) : ;;
     esac
   done
+  test "x$d" = x   || continue
+  test "x$buf" = x || printf "$buf" || exit 2
+  buf=
 done
 
 # restore default IFS
@@ -174,6 +177,5 @@ IFS=" $tab$newline"
 
 # exit if after removing comments
 # an element is not two-hex-digits.
-test "x$d" = x || exit 1
-
-printf "$buf" || exit 2
+test "x$d" = x   || exit 1
+test "x$buf" = x || printf "$buf" || exit 2
