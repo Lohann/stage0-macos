@@ -369,63 +369,20 @@ static inline bool CC_add_u64(uint64_t *res, uint64_t lhs, uint64_t rhs, uint8_t
 #endif
 
 /*
- * Fallback 'CC_clz32' and 'CC_clz64' implementation, only
- * used when at least one of them is already defined.
+ * Fallback 'CC_clz64' and 'CC_clz32' implementation, used
+ * when exists builtin support for at least one of them.
  */
-#if !defined(CC_clz32) && defined(CC_clz64)
-    static inline uint8_t CC_clz32(uint32_t x) {
-        uint64_t v = CC_wrap_u64((uint64_t)x, 32) << 32;
-        return CC_clz64(v | UINT64_C(0x00000000FFFFFFFF));
-    }
-#elif defined(CC_clz32) && !defined(CC_clz64)
+#if defined(CC_clz32) && !defined(CC_clz64)
     static inline uint8_t CC_clz64(uint64_t x) {
         unsigned int n = 0;
         if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
         return ((uint8_t)(32 - n)) + CC_clz32((uint32_t)CC_wrap_u64(x >> n, 32));
     }
-#endif
-
-/*
- * Portable CC_clz32 implementation for uint32_t.
- */
-#if !defined(CC_clz32)
-#if defined(_MSC_VER)
+#elif !defined(CC_clz32) && defined(CC_clz64)
     static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned long index;
-        if (_BitScanReverse(&index, x)) {
-            return UINT8_C(31) - CC_wrap_u8((uint8_t)index, 5);
-        }
-        return UINT8_C(32);
+        uint64_t v = CC_wrap_u64((uint64_t)x, 32) << 32;
+        return CC_clz64(v | UINT64_C(0x00000000FFFFFFFF));
     }
-#elif defined(CC_clz16)
-    /* Implement 'CC_clz32' using CC_clz16 */
-    static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned int n = 0;
-        if (x & UINT32_C(0xFFFF0000)) n += 16;
-        return ((uint8_t)(16 - n)) + CC_clz16((uint16_t)CC_wrap_u32(x >> n, 16));
-    }
-#elif defined(CC_clz8)
-    /* Implement 'CC_clz32' using CC_clz8 */
-    static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned int n = 0;
-        if (x & UINT32_C(0xFFFF0000)) n += 16;
-        if (x & UINT32_C(0xFF00FF00)) n += 8;
-        return ((uint8_t)(24 - n)) + CC_clz8((uint8_t)CC_wrap_u32(x >> n, 8));
-    }
-#else
-    /* Pure portable fallback (binary search method) */
-    static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned int n = 32;
-        x &= (uint32_t)(-((int32_t)x));
-        if (x) n--;
-        if (x & UINT32_C(0x0000FFFF)) n -= 16;
-        if (x & UINT32_C(0x00FF00FF)) n -= 8;
-        if (x & UINT32_C(0x0F0F0F0F)) n -= 4;
-        if (x & UINT32_C(0x33333333)) n -= 2;
-        if (x & UINT32_C(0x55555555)) n -= 1;
-        return (uint8_t)n;
-    }
-#endif
 #endif
 
 /* Portable CC_clz64 implementation for uint64_t  */
@@ -474,6 +431,49 @@ static inline bool CC_add_u64(uint64_t *res, uint64_t lhs, uint64_t rhs, uint8_t
         if (x & UINT64_C(0x0F0F0F0F0F0F0F0F)) n -= 4;
         if (x & UINT64_C(0x3333333333333333)) n -= 2;
         if (x & UINT64_C(0x5555555555555555)) n -= 1;
+        return (uint8_t)n;
+    }
+#endif
+#endif
+
+/*
+ * Portable CC_clz32 implementation for uint32_t.
+ */
+#if !defined(CC_clz32)
+#if defined(_MSC_VER)
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned long index;
+        if (_BitScanReverse(&index, x)) {
+            return UINT8_C(31) - CC_wrap_u8((uint8_t)index, 5);
+        }
+        return UINT8_C(32);
+    }
+#elif defined(CC_clz16)
+    /* Implement 'CC_clz32' using CC_clz16 */
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned int n = 0;
+        if (x & UINT32_C(0xFFFF0000)) n += 16;
+        return ((uint8_t)(16 - n)) + CC_clz16((uint16_t)CC_wrap_u32(x >> n, 16));
+    }
+#elif defined(CC_clz8)
+    /* Implement 'CC_clz32' using CC_clz8 */
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned int n = 0;
+        if (x & UINT32_C(0xFFFF0000)) n += 16;
+        if (x & UINT32_C(0xFF00FF00)) n += 8;
+        return ((uint8_t)(24 - n)) + CC_clz8((uint8_t)CC_wrap_u32(x >> n, 8));
+    }
+#else
+    /* Pure portable fallback (binary search method) */
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned int n = 32;
+        x &= (uint32_t)(-((int32_t)x));
+        if (x) n--;
+        if (x & UINT32_C(0x0000FFFF)) n -= 16;
+        if (x & UINT32_C(0x00FF00FF)) n -= 8;
+        if (x & UINT32_C(0x0F0F0F0F)) n -= 4;
+        if (x & UINT32_C(0x33333333)) n -= 2;
+        if (x & UINT32_C(0x55555555)) n -= 1;
         return (uint8_t)n;
     }
 #endif
