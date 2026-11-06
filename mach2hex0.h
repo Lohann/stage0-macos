@@ -1,3 +1,6 @@
+#ifndef __MACH2HEX_HEADER__
+#define __MACH2HEX_HEADER__
+
 /*
  * Copyright (C) 2026 Lohann Paterno Coutinho Ferreira (developer@lohann.dev)
  * 
@@ -19,6 +22,7 @@
  */
 
 #include <stdint.h>
+#include <limits.h>
 
 /******************************/
 /* Detect C Compiler Features */
@@ -316,114 +320,119 @@ static inline bool CC_add_u64(uint64_t *res, uint64_t lhs, uint64_t rhs, uint8_t
 }
 
 /**
- * Portable Count Leading Zeros (CLZ)
+ * Unset fixed size aliases to Count Leading Zeros (CLZ) builtins
  */
 #undef CC_clz8
 #undef CC_clz16
 #undef CC_clz32
 #undef CC_clz64
 
-/* Detect C Compiler '__builtin_clz' support */
+/* 
+ * Detect C Compiler '__builtin_clz' support
+ */
 #if CC_has_builtin(clz)
+    static inline uint8_t CC_clz(unsigned int x) {
+        return x == 0U ? ((uint8_t)((sizeof (unsigned int)) * 8)) : ((uint8_t)__builtin_clz(x));
+    }
 #   if UINT8_MAX >= UINT_MAX
-#      define CC_clz8(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u8((uint8_t)(x), 8)))
+#       define CC_clz8 CC_clz
 #   elif UINT16_MAX >= UINT_MAX
-#      define CC_clz16(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u16((uint16_t)(x), 16)))
+#       define CC_clz16 CC_clz
 #   elif UINT32_MAX >= UINT_MAX
-#      define CC_clz32(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u32((uint32_t)(x), 32)))
+#       define CC_clz32 CC_clz
 #   elif UINT64_MAX >= UINT_MAX
-#      define CC_clz64(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u64((uint64_t)(x), 64)))
+#       define CC_clz64 CC_clz
 #   endif
 #endif
 
 /* 
  * Detect C Compiler '__builtin_clzl' support
- * note: only enabled when 'sizeof(unsigned long) > sizeof(unsigned int)'
  */
-#if CC_has_builtin(clzl) && defined(ULONG_MAX) && ULONG_MAX > UINT_MAX
-#   if  UINT8_MAX >= ULONG_MAX && !(defined(CC_clz8) || defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
-#      define CC_clz8(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u8((uint8_t)(x), 8)))
-#   elif UINT16_MAX >= ULONG_MAX && !(defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
-#      define CC_clz16(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u16((uint16_t)(x), 16)))
-#   elif UINT32_MAX >= ULONG_MAX && !(defined(CC_clz32) || defined(CC_clz64))
-#      define CC_clz32(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u32((uint32_t)(x), 32)))
-#   elif UINT64_MAX >= ULONG_MAX && !defined(CC_clz64)
-#      define CC_clz64(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u64((uint64_t)(x), 64)))
+#if CC_has_builtin(clzl)
+    static inline uint8_t CC_clzl(unsigned long x) {
+        return x == 0UL ? ((uint8_t)(sizeof(unsigned long) * 8)) : ((uint8_t)__builtin_clzl(x));
+    }
+#   if  UINT8_MAX == ULONG_MAX && !defined(CC_clz8) && !defined(CC_clz16) && !defined(CC_clz32) && !defined(CC_clz64)
+#       define CC_clz8 CC_clzl
+#   elif UINT16_MAX == ULONG_MAX && !defined(CC_clz16) && !defined(CC_clz32) && !defined(CC_clz64)
+#       define CC_clz16 CC_clzl
+#   elif UINT32_MAX == ULONG_MAX && !defined(CC_clz32) && !defined(CC_clz64)
+#       define CC_clz32 CC_clzl
+#   elif UINT64_MAX == ULONG_MAX && !defined(CC_clz64)
+#       define CC_clz64 CC_clzl
 #   endif
 #endif
 
 /* 
  * Detect C Compiler '__builtin_clzll' support
- * note: only enabled when 'sizeof(unsigned long long) > sizeof(unsigned long)'
  */
-#if CC_has_builtin(clzll) && defined(ULLONG_MAX) && ULLONG_MAX > ULONG_MAX
-#   if UINT8_MAX >= ULLONG_MAX && !(defined(CC_clz8) || defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
-#      define CC_clz8(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u8((uint8_t)(x), 8)))
-#   elif UINT16_MAX >= ULLONG_MAX && !(defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
-#      define CC_clz16(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u16((uint16_t)(x), 16)))
-#   elif UINT32_MAX >= ULLONG_MAX && !(defined(CC_clz32) || defined(CC_clz64))
-#      define CC_clz32(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u32((uint32_t)(x), 32)))
-#   elif UINT64_MAX >= ULLONG_MAX && !defined(CC_clz64)
-#      define CC_clz64(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u64((uint64_t)(x), 64)))
+#if CC_has_builtin(clzll)
+    static inline uint8_t CC_clzll(unsigned long long x) {
+        return x == 0ULL ? ((uint8_t)(sizeof(unsigned long long) * 8)) : ((uint8_t)__builtin_clzll(x));
+    }
+#   if UINT8_MAX == ULLONG_MAX && !defined(CC_clz8) && !defined(CC_clz16) && !defined(CC_clz32) && !defined(CC_clz64)
+#       define CC_clz8 CC_clzll
+#   elif UINT16_MAX == ULLONG_MAX && !defined(CC_clz16) && !defined(CC_clz32) && !defined(CC_clz64)
+#       define CC_clz16 CC_clzll
+#   elif UINT32_MAX == ULLONG_MAX && !defined(CC_clz32) && !defined(CC_clz64)
+#       define CC_clz32 CC_clzll
+#   elif UINT64_MAX == ULLONG_MAX && !defined(CC_clz64)
+#       define CC_clz64 CC_clzll
 #   endif
 #endif
 
 /*
- * Fallback 'CC_clz64' and 'CC_clz32' implementation, used
- * when exists builtin support for at least one of them.
+ * Portable implementation of 'CC_clz32' and 'CC_clz64'
  */
+#if (!defined(CC_clz64) || !defined(CC_clz32))
+// 'CC_clz64' and 'CC_clz32' are builtins
 #if defined(CC_clz32) && !defined(CC_clz64)
+    /* Compute 'CC_clz64' using CC_clz32 */
     static inline uint8_t CC_clz64(uint64_t x) {
         unsigned int n = 0;
         if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
         return ((uint8_t)(32 - n)) + CC_clz32((uint32_t)CC_wrap_u64(x >> n, 32));
     }
 #elif !defined(CC_clz32) && defined(CC_clz64)
-    static inline uint8_t CC_clz32(uint32_t x) {
-        uint64_t v = CC_wrap_u64((uint64_t)x, 32) << 32;
-        return CC_clz64(v | UINT64_C(0x00000000FFFFFFFF));
-    }
-#endif
-
-/* Portable CC_clz64 implementation for uint64_t  */
-#if !defined(CC_clz64)
-#if defined(_MSC_VER)
-    static inline uint8_t CC_clz64(uint64_t x) {
+    /* Compute 'CC_clz32' using CC_clz64 */
+#    define CC_clz32(x) (CC_clz64(CC_wrap_u64((uint64_t)(x), 32)) - UINT8_C(32))
+#    if !defined(CC_clz16)
+        /* Compute 'CC_clz16' using CC_clz64 */
+#        define CC_clz16(x) (CC_clz64(CC_wrap_u64((uint64_t)(x), 16)) - UINT8_C(48))
+#        if !defined(CC_clz8)
+            /* Compute 'CC_clz8' using CC_clz64 */
+#            define CC_clz8(x) (CC_clz64(CC_wrap_u64((uint64_t)(x), 8)) - UINT8_C(56))
+#        endif
+#    endif
+#elif defined(_MSC_VER)
+    /* Compute 'CC_clz64' and 'CC_clz32' using _BitScanReverse64 and _BitScanReverse */
+#   define CC_clz64(x) CC_clz64_fallback((uint64_t)(x))
+    static inline uint8_t CC_clz64_fallback(uint64_t x) {
         unsigned long index;
-        if (_BitScanReverse64(&index, x)) {
+        x = CC_wrap_u64(x, 64);
+        if (x == 0)
+            return UINT8_C(64);
+        if (_BitScanReverse64(&index, x))
             return UINT8_C(63) - CC_wrap_u8((uint8_t)index, 6);
-        }
         return UINT8_C(64);
     }
-#elif defined(CC_clz32)
-    /* Implement 'CC_clz64' using CC_clz32 */
-    static inline uint8_t CC_clz64(uint64_t x) {
-        unsigned int n = 0;
-        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
-        return ((uint8_t)(32 - n)) + CC_clz32((uint32_t)CC_wrap_u64(x >> n, 32)));
-    }
-#elif defined(CC_clz16)
-    /* Implement 'CC_clz64' using CC_clz16 */
-    static inline uint8_t CC_clz64(uint64_t x) {
-        unsigned int n = 0;
-        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
-        if (x & UINT64_C(0xFFFF0000FFFF0000)) n += 16;
-        return ((uint8_t)(48 - n)) + CC_clz16((uint16_t)CC_wrap_u64(x >> n, 16));
-    }
-#elif defined(CC_clz8)
-    /* Implement 'CC_clz64' using CC_clz8 */
-    static inline uint8_t CC_clz64(uint64_t x) {
-        unsigned int n = 0;
-        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
-        if (x & UINT64_C(0xFFFF0000FFFF0000)) n += 16;
-        if (x & UINT64_C(0xFF00FF00FF00FF00)) n += 8;
-        return ((uint8_t)(56 - n)) + CC_clz8((uint8_t)CC_wrap_u64(x >> n, 8));
+
+#   define CC_clz32(x) CC_clz32_fallback((uint32_t)(x))
+    static inline uint8_t CC_clz32_fallback(uint32_t x) {
+        unsigned long index;
+        x = CC_wrap_u32(x, 32);
+        if (x == 0)
+            return UINT8_C(32);
+        if (_BitScanReverse(&index, x))
+            return UINT8_C(31) - CC_wrap_u8((uint8_t)index, 5);
+        return UINT8_C(32);
     }
 #else
     /* Pure portable fallback (binary search method) */
-    static inline uint8_t CC_clz64(uint64_t x) {
+#   define CC_clz64(x) CC_clz64_fallback((uint64_t)(x))
+    static inline uint8_t CC_clz64_fallback(uint64_t x) {
         unsigned int n = 64;
-        x &= (uint64_t)(-((int64_t)x));
+        x &= CC_wrap_u64((uint64_t)(-((int64_t)x)), 64);
         if (x) n--;
         if (x & UINT64_C(0x00000000FFFFFFFF)) n -= 32;
         if (x & UINT64_C(0x0000FFFF0000FFFF)) n -= 16;
@@ -431,68 +440,67 @@ static inline bool CC_add_u64(uint64_t *res, uint64_t lhs, uint64_t rhs, uint8_t
         if (x & UINT64_C(0x0F0F0F0F0F0F0F0F)) n -= 4;
         if (x & UINT64_C(0x3333333333333333)) n -= 2;
         if (x & UINT64_C(0x5555555555555555)) n -= 1;
-        return (uint8_t)n;
+        return CC_wrap_u8((uint8_t)n, 6);
     }
-#endif
-#endif
 
-/*
- * Portable CC_clz32 implementation for uint32_t.
- */
-#if !defined(CC_clz32)
-#if defined(_MSC_VER)
-    static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned long index;
-        if (_BitScanReverse(&index, x)) {
-            return UINT8_C(31) - CC_wrap_u8((uint8_t)index, 5);
-        }
-        return UINT8_C(32);
-    }
-#elif defined(CC_clz16)
-    /* Implement 'CC_clz32' using CC_clz16 */
-    static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned int n = 0;
-        if (x & UINT32_C(0xFFFF0000)) n += 16;
-        return ((uint8_t)(16 - n)) + CC_clz16((uint16_t)CC_wrap_u32(x >> n, 16));
-    }
-#elif defined(CC_clz8)
-    /* Implement 'CC_clz32' using CC_clz8 */
-    static inline uint8_t CC_clz32(uint32_t x) {
-        unsigned int n = 0;
-        if (x & UINT32_C(0xFFFF0000)) n += 16;
-        if (x & UINT32_C(0xFF00FF00)) n += 8;
-        return ((uint8_t)(24 - n)) + CC_clz8((uint8_t)CC_wrap_u32(x >> n, 8));
-    }
-#else
-    /* Pure portable fallback (binary search method) */
-    static inline uint8_t CC_clz32(uint32_t x) {
+#   define CC_clz32(x) CC_clz32_fallback((uint32_t)(x))
+    static inline uint8_t CC_clz32_fallback(uint32_t x) {
         unsigned int n = 32;
-        x &= (uint32_t)(-((int32_t)x));
+        x &= CC_wrap_u32((uint32_t)(-((int32_t)x)), 32);
         if (x) n--;
         if (x & UINT32_C(0x0000FFFF)) n -= 16;
         if (x & UINT32_C(0x00FF00FF)) n -= 8;
         if (x & UINT32_C(0x0F0F0F0F)) n -= 4;
         if (x & UINT32_C(0x33333333)) n -= 2;
         if (x & UINT32_C(0x55555555)) n -= 1;
-        return (uint8_t)n;
+        return CC_wrap_u8((uint8_t)n, 5);
     }
+
+#   if !defined(CC_clz16)
+#       define CC_clz16(x) CC_clz16_fallback((uint16_t)(x))
+        static inline uint8_t CC_clz16_fallback(uint16_t x) {
+            uint8_t n = 16;
+            x &= CC_wrap_u16((uint16_t)(-((int16_t)x)), 16);
+            if (x) n--;
+            if (x & UINT16_C(0x00FF)) n -= 8;
+            if (x & UINT16_C(0x0F0F)) n -= 4;
+            if (x & UINT16_C(0x3333)) n -= 2;
+            if (x & UINT16_C(0x5555)) n -= 1;
+            return n;
+        }
+    else
+        /* Implement 'CC_clz8' using CC_clz16 */
+#       define CC_clz8(x) (CC_clz16(CC_wrap_u16((uint16_t)(x), 8)) - UINT8_C(8))
+#   endif
+
+#   if !defined(CC_clz8)
+#       define CC_clz8(x) CC_clz8_fallback((uint8_t)(x))
+        static inline uint8_t CC_clz8_fallback(uint8_t x) {
+            uint8_t n = 8;
+            x &= CC_wrap_u8((uint8_t)(-((int8_t)x)), 8);
+            if (x) n--;
+            if (x & UINT8_C(0x0F)) n -= 4;
+            if (x & UINT8_C(0x33)) n -= 2;
+            if (x & UINT8_C(0x55)) n -= 1;
+            return n;
+        }
+#   endif
 #endif
 #endif
 
-/* Fallback CC_clz16 implementation using CC_clz32 */
+/*
+ * Portable implementation of 'CC_clz8' and 'CC_clz16'
+ */
 #if !defined(CC_clz16)
-    static inline uint8_t CC_clz16(uint16_t x) {
-        uint32_t v = CC_wrap_u32((uint32_t)x, 16) << 16;
-        return CC_clz32(v | UINT32_C(0x0000FFFF));
-    }
-#endif
-
-/* Fallback CC_clz8 implementation using CC_clz16 */
-#if !defined(CC_clz8)
-    static inline uint8_t CC_clz8(uint8_t x) {
-        uint16_t v = CC_wrap_u16((uint16_t)x, 8) << 8;
-        return CC_clz16(v | UINT16_C(0x00FF));
-    }
+     /* Compute 'CC_clz16' using CC_clz32 */
+#    define CC_clz16(x) (CC_clz32(CC_wrap_u32((uint32_t)(x), 16)) - UINT8_C(16))
+#    if !defined(CC_clz8)
+         /* Compute 'CC_clz8' using CC_clz32 */
+#        define CC_clz8(x) (CC_clz32(CC_wrap_u32((uint32_t)(x), 8)) - UINT8_C(24))
+#    endif
+#elif !defined(CC_clz8)
+    /* Compute 'CC_clz8' using CC_clz16 */
+#   define CC_clz8(x) (CC_clz16(CC_wrap_u16((uint16_t)(x), 8)) - UINT8_C(8))
 #endif
 
 /************************/
@@ -3550,3 +3558,5 @@ enum {
 	CS_VALIDATION_CATEGORY_OOPJIT = 9,
 	CS_VALIDATION_CATEGORY_NONE = 10,
 };
+
+#endif // __MACH2HEX_HEADER__

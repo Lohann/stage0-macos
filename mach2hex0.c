@@ -21,7 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <limits.h>
 #include <inttypes.h>
 #include "mach2hex0.h"
 
