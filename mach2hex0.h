@@ -246,6 +246,255 @@
 #   define CC_init_i128(hi, lo) ((uint128_t){ .h##i = ((int64_t)hi),  .l##o = ((uint64_t)lo) })
 #endif
 
+
+/**********************/
+/* arithmetic helpers */
+/**********************/
+
+/* 
+ * In ANSI-C (C99) integer overflow behavior is undefined,
+ * following helpers enforces consistent behavior.
+ */
+static inline uint8_t CC_shr_u8(uint8_t lhs, uint8_t rhs) { return lhs >> rhs; }
+static inline uint8_t CC_wrap_u8(uint8_t val, uint8_t bits) { return val & CC_shr_u8(UINT8_MAX, ((uint8_t)(sizeof(uint8_t) * 8)) - bits); }
+static inline bool CC_add_u8(uint8_t *res, uint8_t lhs, uint8_t rhs, uint8_t bits) {
+    uint8_t full_res;
+    bool overflow;
+#if CC_has_builtin(add_overflow) || defined(__GNUC__)
+    overflow = __builtin_add_overflow(lhs, rhs, &full_res);
+#else
+    full_res = lhs + rhs;
+    overflow = full_res < lhs;
+#endif
+    *res = CC_wrap_u8(full_res, bits);
+    return overflow || full_res < UINT8_C(0) || full_res > UINT8_MAX;
+}
+
+static inline uint16_t CC_shr_u16(uint16_t lhs, uint8_t rhs) { return lhs >> rhs; }
+static inline uint16_t CC_wrap_u16(uint16_t val, uint8_t bits) { return val & CC_shr_u16(UINT16_MAX, ((uint8_t)(sizeof(uint16_t) * 8)) - bits); }
+static inline bool CC_add_u16(uint16_t *res, uint16_t lhs, uint16_t rhs, uint8_t bits) {
+    uint16_t full_res;
+    bool overflow;
+#if CC_has_builtin(add_overflow) || defined(__GNUC__)
+    overflow = __builtin_add_overflow(lhs, rhs, &full_res);
+#else
+    full_res = lhs + rhs;
+    overflow = full_res < lhs;
+#endif
+    *res = CC_wrap_u16(full_res, bits);
+    return overflow || full_res < UINT16_C(0) || full_res > UINT16_MAX;
+}
+
+static inline uint32_t CC_shr_u32(uint32_t lhs, uint8_t rhs) { return lhs >> rhs; }
+static inline uint32_t CC_wrap_u32(uint32_t val, uint8_t bits) { return val & CC_shr_u32(UINT32_MAX, ((uint8_t)(sizeof(uint32_t) * 8)) - bits); }
+static inline bool CC_add_u32(uint32_t *res, uint32_t lhs, uint32_t rhs, uint8_t bits) {
+    uint32_t full_res;
+    bool overflow;
+#if CC_has_builtin(add_overflow) || defined(__GNUC__)
+    overflow = __builtin_add_overflow(lhs, rhs, &full_res);
+#else
+    full_res = lhs + rhs;
+    overflow = full_res < lhs;
+#endif
+    *res = CC_wrap_u32(full_res, bits);
+    return overflow || full_res < UINT32_C(0) || full_res > UINT32_MAX;
+}
+
+static inline uint64_t CC_shr_u64(uint64_t lhs, uint8_t rhs) { return lhs >> rhs; }
+static inline uint64_t CC_wrap_u64(uint64_t val, uint8_t bits) { return val & CC_shr_u64(UINT64_MAX, ((uint8_t)(sizeof(uint64_t) * 8)) - bits); }
+static inline bool CC_add_u64(uint64_t *res, uint64_t lhs, uint64_t rhs, uint8_t bits) {
+    uint64_t full_res;
+    bool overflow;
+#if CC_has_builtin(add_overflow) || defined(__GNUC__)
+    overflow = __builtin_add_overflow(lhs, rhs, &full_res);
+#else
+    full_res = lhs + rhs;
+    overflow = full_res < lhs;
+#endif
+    *res = CC_wrap_u64(full_res, bits);
+    return overflow || full_res < UINT64_C(0) || full_res > UINT64_MAX;
+}
+
+/**
+ * Portable Count Leading Zeros (CLZ)
+ */
+#undef CC_clz8
+#undef CC_clz16
+#undef CC_clz32
+#undef CC_clz64
+
+/* Detect C Compiler '__builtin_clz' support */
+#if CC_has_builtin(clz)
+#   if UINT8_MAX >= UINT_MAX
+#      define CC_clz8(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u8((uint8_t)(x), 8)))
+#   elif UINT16_MAX >= UINT_MAX
+#      define CC_clz16(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u16((uint16_t)(x), 16)))
+#   elif UINT32_MAX >= UINT_MAX
+#      define CC_clz32(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u32((uint32_t)(x), 32)))
+#   elif UINT64_MAX >= UINT_MAX
+#      define CC_clz64(x) ((uint8_t)__builtin_clzl((unsigned int)CC_wrap_u64((uint64_t)(x), 64)))
+#   endif
+#endif
+
+/* 
+ * Detect C Compiler '__builtin_clzl' support
+ * note: only enabled when 'sizeof(unsigned long) > sizeof(unsigned int)'
+ */
+#if CC_has_builtin(clzl) && defined(ULONG_MAX) && ULONG_MAX > UINT_MAX
+#   if  UINT8_MAX >= ULONG_MAX && !(defined(CC_clz8) || defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
+#      define CC_clz8(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u8((uint8_t)(x), 8)))
+#   elif UINT16_MAX >= ULONG_MAX && !(defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
+#      define CC_clz16(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u16((uint16_t)(x), 16)))
+#   elif UINT32_MAX >= ULONG_MAX && !(defined(CC_clz32) || defined(CC_clz64))
+#      define CC_clz32(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u32((uint32_t)(x), 32)))
+#   elif UINT64_MAX >= ULONG_MAX && !defined(CC_clz64)
+#      define CC_clz64(x) ((uint8_t)__builtin_clzl((unsigned long)CC_wrap_u64((uint64_t)(x), 64)))
+#   endif
+#endif
+
+/* 
+ * Detect C Compiler '__builtin_clzll' support
+ * note: only enabled when 'sizeof(unsigned long long) > sizeof(unsigned long)'
+ */
+#if CC_has_builtin(clzll) && defined(ULLONG_MAX) && ULLONG_MAX > ULONG_MAX
+#   if UINT8_MAX >= ULLONG_MAX && !(defined(CC_clz8) || defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
+#      define CC_clz8(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u8((uint8_t)(x), 8)))
+#   elif UINT16_MAX >= ULLONG_MAX && !(defined(CC_clz16) || defined(CC_clz32) || defined(CC_clz64))
+#      define CC_clz16(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u16((uint16_t)(x), 16)))
+#   elif UINT32_MAX >= ULLONG_MAX && !(defined(CC_clz32) || defined(CC_clz64))
+#      define CC_clz32(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u32((uint32_t)(x), 32)))
+#   elif UINT64_MAX >= ULLONG_MAX && !defined(CC_clz64)
+#      define CC_clz64(x) ((uint8_t)__builtin_clzl((unsigned long long)CC_wrap_u64((uint64_t)(x), 64)))
+#   endif
+#endif
+
+/*
+ * Fallback 'CC_clz32' and 'CC_clz64' implementation, only
+ * used when at least one of them is already defined.
+ */
+#if !defined(CC_clz32) && defined(CC_clz64)
+    static inline uint8_t CC_clz32(uint32_t x) {
+        uint64_t v = CC_wrap_u64((uint64_t)x, 32) << 32;
+        return CC_clz64(v | UINT64_C(0x00000000FFFFFFFF));
+    }
+#elif defined(CC_clz32) && !defined(CC_clz64)
+    static inline uint8_t CC_clz64(uint64_t x) {
+        unsigned int n = 0;
+        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
+        return ((uint8_t)(32 - n)) + CC_clz32((uint32_t)CC_wrap_u64(x >> n, 32));
+    }
+#endif
+
+/*
+ * Portable CC_clz32 implementation for uint32_t.
+ */
+#if !defined(CC_clz32)
+#if defined(_MSC_VER)
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned long index;
+        if (_BitScanReverse(&index, x)) {
+            return UINT8_C(31) - CC_wrap_u8((uint8_t)index, 5);
+        }
+        return UINT8_C(32);
+    }
+#elif defined(CC_clz16)
+    /* Implement 'CC_clz32' using CC_clz16 */
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned int n = 0;
+        if (x & UINT32_C(0xFFFF0000)) n += 16;
+        return ((uint8_t)(16 - n)) + CC_clz16((uint16_t)CC_wrap_u32(x >> n, 16));
+    }
+#elif defined(CC_clz8)
+    /* Implement 'CC_clz32' using CC_clz8 */
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned int n = 0;
+        if (x & UINT32_C(0xFFFF0000)) n += 16;
+        if (x & UINT32_C(0xFF00FF00)) n += 8;
+        return ((uint8_t)(24 - n)) + CC_clz8((uint8_t)CC_wrap_u32(x >> n, 8));
+    }
+#else
+    /* Pure portable fallback (binary search method) */
+    static inline uint8_t CC_clz32(uint32_t x) {
+        unsigned int n = 32;
+        x &= (uint32_t)(-((int32_t)x));
+        if (x) n--;
+        if (x & UINT32_C(0x0000FFFF)) n -= 16;
+        if (x & UINT32_C(0x00FF00FF)) n -= 8;
+        if (x & UINT32_C(0x0F0F0F0F)) n -= 4;
+        if (x & UINT32_C(0x33333333)) n -= 2;
+        if (x & UINT32_C(0x55555555)) n -= 1;
+        return (uint8_t)n;
+    }
+#endif
+#endif
+
+/* Portable CC_clz64 implementation for uint64_t  */
+#if !defined(CC_clz64)
+#if defined(_MSC_VER)
+    static inline uint8_t CC_clz64(uint64_t x) {
+        unsigned long index;
+        if (_BitScanReverse64(&index, x)) {
+            return UINT8_C(63) - CC_wrap_u8((uint8_t)index, 6);
+        }
+        return UINT8_C(64);
+    }
+#elif defined(CC_clz32)
+    /* Implement 'CC_clz64' using CC_clz32 */
+    static inline uint8_t CC_clz64(uint64_t x) {
+        unsigned int n = 0;
+        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
+        return ((uint8_t)(32 - n)) + CC_clz32((uint32_t)CC_wrap_u64(x >> n, 32)));
+    }
+#elif defined(CC_clz16)
+    /* Implement 'CC_clz64' using CC_clz16 */
+    static inline uint8_t CC_clz64(uint64_t x) {
+        unsigned int n = 0;
+        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
+        if (x & UINT64_C(0xFFFF0000FFFF0000)) n += 16;
+        return ((uint8_t)(48 - n)) + CC_clz16((uint16_t)CC_wrap_u64(x >> n, 16));
+    }
+#elif defined(CC_clz8)
+    /* Implement 'CC_clz64' using CC_clz8 */
+    static inline uint8_t CC_clz64(uint64_t x) {
+        unsigned int n = 0;
+        if (x & UINT64_C(0xFFFFFFFF00000000)) n += 32;
+        if (x & UINT64_C(0xFFFF0000FFFF0000)) n += 16;
+        if (x & UINT64_C(0xFF00FF00FF00FF00)) n += 8;
+        return ((uint8_t)(56 - n)) + CC_clz8((uint8_t)CC_wrap_u64(x >> n, 8));
+    }
+#else
+    /* Pure portable fallback (binary search method) */
+    static inline uint8_t CC_clz64(uint64_t x) {
+        unsigned int n = 64;
+        x &= (uint64_t)(-((int64_t)x));
+        if (x) n--;
+        if (x & UINT64_C(0x00000000FFFFFFFF)) n -= 32;
+        if (x & UINT64_C(0x0000FFFF0000FFFF)) n -= 16;
+        if (x & UINT64_C(0x00FF00FF00FF00FF)) n -= 8;
+        if (x & UINT64_C(0x0F0F0F0F0F0F0F0F)) n -= 4;
+        if (x & UINT64_C(0x3333333333333333)) n -= 2;
+        if (x & UINT64_C(0x5555555555555555)) n -= 1;
+        return (uint8_t)n;
+    }
+#endif
+#endif
+
+/* Fallback CC_clz16 implementation using CC_clz32 */
+#if !defined(CC_clz16)
+    static inline uint8_t CC_clz16(uint16_t x) {
+        uint32_t v = CC_wrap_u32((uint32_t)x, 16) << 16;
+        return CC_clz32(v | UINT32_C(0x0000FFFF));
+    }
+#endif
+
+/* Fallback CC_clz8 implementation using CC_clz16 */
+#if !defined(CC_clz8)
+    static inline uint8_t CC_clz8(uint8_t x) {
+        uint16_t v = CC_wrap_u16((uint16_t)x, 8) << 8;
+        return CC_clz16(v | UINT16_C(0x00FF));
+    }
+#endif
+
 /************************/
 /* structs and typedefs */
 /************************/
@@ -257,7 +506,7 @@ typedef int32_t cpu_subtype_t;
  * The 32-bit mach header appears at the very beginning of the object file for
  * 32-bit architectures.
  */
-struct mach_header {
+struct mach_header_32 {
     uint32_t magic;           /* mach magic number identifier */
     cpu_type_t cputype;       /* cpu specifier */
     cpu_subtype_t cpusubtype; /* machine specifier */
@@ -266,7 +515,7 @@ struct mach_header {
     uint32_t sizeofcmds;      /* the size of all the load commands */
     uint32_t flags;           /* flags */
 };
-/* Constant for the magic field of the mach_header (32-bit architectures) */
+/* Constant for the magic field of the mach_header_32 (32-bit architectures) */
 #define	MH_MAGIC 0xfeedface	/* the mach magic number */
 #define MH_CIGAM 0xcefaedfe	/* NXSwapInt(MH_MAGIC) */
 

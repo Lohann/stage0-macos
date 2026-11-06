@@ -35,37 +35,21 @@
 #   define to_u16be(val) CC_bswap16(val)
 #   define to_u32be(val) CC_bswap32(val)
 #   define to_u64be(val) CC_bswap64(val)
-#   define to_u16le(val) ((uint16_t)(val))
-#   define to_u32le(val) ((uint32_t)(val))
-#   define to_u64le(val) ((uint64_t)(val))
+#   define to_u16le(val) (((uint16_t)(val)) & UINT16_MAX)
+#   define to_u32le(val) (((uint32_t)(val)) & UINT32_MAX)
+#   define to_u64le(val) (((uint64_t)(val)) & UINT64_MAX)
 #else
-#   define to_u16be(val) ((uint16_t)(val))
-#   define to_u32be(val) ((uint32_t)(val))
-#   define to_u64be(val) ((uint64_t)(val))
+#   define to_u16be(val) (((uint16_t)(val)) & UINT16_MAX)
+#   define to_u32be(val) (((uint32_t)(val)) & UINT32_MAX)
+#   define to_u64be(val) (((uint64_t)(val)) & UINT64_MAX)
 #   define to_u16le(val) CC_bswap16(val)
 #   define to_u32le(val) CC_bswap32(val)
 #   define to_u64le(val) CC_bswap64(val)
 #endif
 
-/* In ANSI-C (C99) integer overflow behavior is undefined,
- * following helpers enforces consistent behavior. */
-static inline uint32_t CC_shr_u32(uint32_t lhs, uint8_t rhs) { return lhs >> rhs; }
-static inline uint32_t CC_wrap_u32(uint32_t val, uint8_t bits) { return val & CC_shr_u32(UINT32_MAX, 32 - bits); }
-static inline bool CC_add_u32(uint32_t *res, uint32_t lhs, uint32_t rhs, uint8_t bits) {
-#if CC_has_builtin(add_overflow) || defined(__GNUC__)
-    uint32_t full_res;
-    bool overflow = __builtin_add_overflow(lhs, rhs, &full_res);
-    *res = CC_wrap_u32(full_res, bits);
-    return overflow || full_res < UINT32_C(0) || full_res > UINT32_MAX;
-#else
-    *res = CC_wrap_u32(lhs, rhs, bits);
-    return *res < lhs;
-#endif
-}
-
 /* Convert macro definitions to cstring */
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+#define CC_STRINGIFY(x) #x
+#define CC_TOSTRING(x) CC_STRINGIFY(x)
 
 /************************/
 /* structs and typedefs */
@@ -753,24 +737,27 @@ char *fmt_s(char* CC_restrict dest, const char* CC_restrict src)
 char *fmt_u(char *out, uintmax_t x)
 {
     uintmax_t y = x;
-    char *p = out;
-#if UINTMAX_MAX > UINT64_MAX
-    if (y >= UINTMAX_C(10000000000000000) && (p = p + 16) > out)
+    char *p = out + 1;
+#if UINTMAX_MAX >= UINTMAX_C(10000000000000000)
+    while (y >= UINTMAX_C(10000000000000000)) {
+        p += 16;
         y /= UINTMAX_C(10000000000000000);
-    if (y >= UINTMAX_C(10000000000000000) && (p = p + 16) > out)
-        y /= UINTMAX_C(10000000000000000);
+    }
 #endif
-#if UINTMAX_MAX > UINT32_MAX
-    if (y >= UINTMAX_C(10000000000) && (p = p + 10) > out)
+#if UINTMAX_MAX >= UINTMAX_C(10000000000)
+    if (y >= UINTMAX_C(10000000000)) {
         y /= UINTMAX_C(10000000000);
+        p += 10;
+    }
 #endif
-#if UINTMAX_MAX > UINT16_MAX
-    if (y >= UINTMAX_C(100000) && (p = p + 5) > out)
+#if UINTMAX_MAX > UINTMAX_C(100000)
+    if (y >= UINTMAX_C(100000)) {
         y /= UINTMAX_C(100000);
+        p += 5;
+    }
 #endif
-    y = (((y + UINTMAX_C(393206)) & (y + UINTMAX_C(524188))) ^
-         ((y + UINTMAX_C(916504)) & (y + UINTMAX_C(514288)))) >> 17;
-    p = p + (y + 1);
+    p += (((((uint32_t)y) + UINT32_C(393206)) & (((uint32_t)y) + UINT32_C(524188))) ^
+          ((((uint32_t)y) + UINT32_C(916504)) & (((uint32_t)y) + UINT32_C(514288)))) >> 17;
     if (p < out) return out;
 	for (out=p; x>=10; x/=10) *--out = '0' + x%10;
 	*--out = '0' + x;
@@ -1072,9 +1059,9 @@ int parser_init(mach_decoded_t *p, bytes_t src, size_t len)
     uint32_t i, sizeofcmds;
     const uint32_t *ptr;
     struct load_command *cmd;
-    if (len < sizeof(struct mach_header)) {
-        printf("len < sizeof(struct mach_header)...\n");
-        fflush(stdout);
+    if (len < sizeof(struct mach_header_32)) {
+        fprintf(stderr, "[ERROR] invalid mach_header: below minium size\n");
+        fflush(stderr);
         return -1;
     }
     ptr = (const uint32_t *)src;
@@ -1099,8 +1086,8 @@ int parser_init(mach_decoded_t *p, bytes_t src, size_t len)
             p->header.reserved = 0;
             break;
         default:
-            printf("unknown magic: %"PRIx32"\n", p->header.magic);
-            fflush(stdout);
+            fprintf(stderr, "[ERROR] invalid mach_header magic: %"PRIx32"\n", p->header.magic);
+            fflush(stderr);
             return -1;
             break;
     }
@@ -1543,7 +1530,7 @@ char *dylinker_command2hex0(char *out, const struct dylinker_command *cmd)
 }
 
 /* Encode LC_UNIXTHREAD commands to Hex0 */
-char *unixthread_command2hex0(char *out, const struct mach_header *header, const struct unixthread_command *cmd)
+char *unixthread_command2hex0(char *out, const struct mach_header_32 *header, const struct unixthread_command *cmd)
 {
     union thread_state *ts;
     uint32_t flavor_fmt;
@@ -1827,7 +1814,7 @@ char *unixthread_command2hex0(char *out, const struct mach_header *header, const
 }
 
 /* Encode Load Command to Hex0  */
-char *load_command2hex0(char *out, const struct mach_header *header, const struct load_command *cmd)
+char *load_command2hex0(char *out, const struct mach_header_32 *header, const struct load_command *cmd)
 {
     const char *val;
     uint32_t cmdsize;
@@ -1947,7 +1934,7 @@ int parse(uint8_t *buffer, size_t len)
         // -- COMMAND --
         out = load_command2hex0(
             out,
-            (const struct mach_header*)&p.header,
+            (const struct mach_header_32*)&p.header,
             p.load_commands[(size_t)(cmd_count-1)]
         );
         *out = 0;
@@ -2023,7 +2010,7 @@ int main(int argc, char *argv[]) {
         fail(1, "argument exceed maximum size of 4096 bytes\n");
     
     if (pathlen > PATH_MAX)
-        fail(1, "file path exceeds maximum size of "TOSTRING(PATH_MAX)"\n");
+        fail(1, "file path exceeds maximum size of "CC_TOSTRING(PATH_MAX)"\n");
 
     /* sanitize filepath before print on console. */
     len = pathlen < sizeof(buffer) ? pathlen : sizeof(buffer) - 1;
